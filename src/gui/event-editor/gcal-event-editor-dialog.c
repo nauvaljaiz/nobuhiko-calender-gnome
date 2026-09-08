@@ -21,6 +21,7 @@
 
 #include "gcal-attendee-details-page.h"
 #include "gcal-attendees-section.h"
+#include "gcal-availability-section.h"
 #include "gcal-calendar-combo-row.h"
 #include "gcal-context.h"
 #include "gcal-debug.h"
@@ -190,7 +191,9 @@ clear_and_hide_dialog (GcalEventEditorDialog *self)
 
 static void
 apply_event_properties_to_template_event (GcalEvent *template_event,
-                                          GcalEvent *event)
+                                          GcalEvent *event,
+                                          gboolean   availability_changed,
+                                          gboolean   visibility_changed)
 {
   g_autoptr (GDateTime) start_date = NULL;
   g_autoptr (GDateTime) end_date = NULL;
@@ -222,6 +225,10 @@ apply_event_properties_to_template_event (GcalEvent *template_event,
   gcal_event_set_summary (template_event, gcal_event_get_summary (event));
   gcal_event_set_location (template_event, gcal_event_get_location (event));
   gcal_event_set_description (template_event, gcal_event_get_description (event));
+  if (availability_changed)
+    gcal_event_set_busy (template_event, gcal_event_get_busy (event));
+  if (visibility_changed)
+    gcal_event_set_visibility (template_event, gcal_event_get_visibility (event));
   gcal_event_set_recurrence (template_event, gcal_event_get_recurrence (event));
   gcal_event_set_all_day (template_event, gcal_event_get_all_day (event));
   gcal_event_set_date_start (template_event, start_date);
@@ -275,7 +282,8 @@ save_event (GcalEventEditorDialog *self,
   GcalContext *context;
   GcalManager *manager;
 
-  gboolean calendar_equal, alarms_equal, schedule_equal, strings_equal, event_equal;
+  gboolean calendar_equal, alarms_equal, availability_equal, visibility_equal;
+  gboolean schedule_equal, strings_equal, event_equal;
 
   GCAL_ENTRY;
 
@@ -286,9 +294,12 @@ save_event (GcalEventEditorDialog *self,
 
   calendar_equal = selected_calendar && calendar == selected_calendar;
   alarms_equal = gcal_event_alarms_equal (self->event, self->edited_event);
+  availability_equal = gcal_event_availability_equal (self->event, self->edited_event);
+  visibility_equal = gcal_event_visibility_equal (self->event, self->edited_event);
   schedule_equal = gcal_event_schedule_equal (self->event, self->edited_event);
   strings_equal = gcal_event_strings_equal (self->event, self->edited_event);
-  event_equal = calendar_equal && alarms_equal && schedule_equal && strings_equal;
+  event_equal = calendar_equal && alarms_equal && availability_equal && visibility_equal &&
+                schedule_equal && strings_equal;
 
   if (self->event_is_new)
     {
@@ -465,7 +476,10 @@ on_ask_recurrence_response_save_cb (GcalEvent             *event,
             break;
           }
 
-        apply_event_properties_to_template_event (template_event, event);
+        apply_event_properties_to_template_event (template_event,
+                                                  event,
+                                                  !gcal_event_availability_equal (self->event, event),
+                                                  !gcal_event_visibility_equal (self->event, event));
         gcal_manager_update_event (manager, template_event, mod_type);
       }
       break;
@@ -562,6 +576,7 @@ gcal_event_editor_dialog_class_init (GcalEventEditorDialogClass *klass)
   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
 
   g_type_ensure (GCAL_TYPE_CALENDAR_COMBO_ROW);
+  g_type_ensure (GCAL_TYPE_AVAILABILITY_SECTION);
   g_type_ensure (GCAL_TYPE_NOTES_SECTION);
   g_type_ensure (GCAL_TYPE_REMINDERS_SECTION);
   g_type_ensure (GCAL_TYPE_SCHEDULE_SECTION);

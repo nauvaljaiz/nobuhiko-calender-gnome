@@ -1777,6 +1777,46 @@ msgstr "Google Maps"
 msgid "Bing Maps"
 msgstr "Bing Maps"
 
+#: src/gui/event-editor/gcal-availability-section.blp
+msgid "Availability and Visibility"
+msgstr "Ketersediaan dan Visibilitas"
+
+#: src/gui/event-editor/gcal-availability-section.blp
+msgid "Show Me As"
+msgstr "Tampilkan Saya Sebagai"
+
+#: src/gui/event-editor/gcal-availability-section.blp
+msgid "Free events do not block your availability"
+msgstr "Acara luang tidak memblokir ketersediaan Anda"
+
+#: src/gui/event-editor/gcal-availability-section.blp
+msgid "Busy"
+msgstr "Sibuk"
+
+#: src/gui/event-editor/gcal-availability-section.blp
+msgid "Free"
+msgstr "Luang"
+
+#: src/gui/event-editor/gcal-availability-section.blp
+msgid "Visibility"
+msgstr "Visibilitas"
+
+#: src/gui/event-editor/gcal-availability-section.blp
+msgid "Control who can see the event details"
+msgstr "Atur siapa yang dapat melihat detail acara"
+
+#: src/gui/event-editor/gcal-availability-section.blp
+msgid "Default Visibility"
+msgstr "Visibilitas Bawaan"
+
+#: src/gui/event-editor/gcal-availability-section.blp
+msgid "Public"
+msgstr "Publik"
+
+#: src/gui/event-editor/gcal-availability-section.blp
+msgid "Private"
+msgstr "Pribadi"
+
 #~ msgid "Notes"
 #~ msgstr "Catatan"
 

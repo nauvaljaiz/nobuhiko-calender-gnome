@@ -94,7 +94,7 @@ libgcal_dep = declare_dependency(
 ##################
 
 executable(
-  meson.project_name(),
+  calendar_binary,
        files('main.c'),
           dependencies: libgcal_dep,
                install: true,

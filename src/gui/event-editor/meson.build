@@ -4,6 +4,7 @@ blueprints = custom_target(
   'blueprints',
   input: files(
     'gcal-alarm-row.blp',
+    'gcal-availability-section.blp',
     'gcal-date-chooser-row.blp',
     'gcal-date-selector.blp',
     'gcal-date-time-chooser.blp',
@@ -40,6 +41,7 @@ built_sources += gnome.compile_resources(
 
 sources += files(
   'gcal-alarm-row.c',
+  'gcal-availability-section.c',
   'gcal-date-chooser-row.c',
   'gcal-date-time-chooser.c',
   'gcal-date-selector.c',

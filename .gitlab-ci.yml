@@ -12,8 +12,8 @@ include:
       grcov-c-options: '--ignore "tests/*"'
 
 variables:
-  APP_ID: "org.gnome.Calendar.Devel"
-  BUNDLE: "org.gnome.Calendar.Devel.flatpak"
+  APP_ID: "local.nobuhiko.Calendar.Devel"
+  BUNDLE: "local.nobuhiko.Calendar.Devel.flatpak"
   FLATPAK_MODULE: "gnome-calendar"
   GIT_SUBMODULE_STRATEGY: 'normal'
   MANIFEST_PATH: "build-aux/org.gnome.Calendar.json"

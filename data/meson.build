@@ -3,11 +3,11 @@ subdir('icons')
 enum_headers = files(src_dir / 'gcal-enums.h')
 
 enums_xml = gnome.mkenums(
-  'org.gnome.calendar.enums.xml',
+  application_id + '.enums.xml',
          sources: enum_headers,
         comments: '<!-- @comment@ -->',
            fhead: '<schemalist>',
-           vhead: '  <@type@ id="org.gnome.calendar.@EnumName@">',
+           vhead: '  <@type@ id="' + application_id + '.@EnumName@">',
            vprod: '    <value nick="@valuenick@" value="@valuenum@"/>',
            vtail: '  </@type@>',
            ftail: '</schemalist>',
@@ -19,6 +19,7 @@ enums_xml = gnome.mkenums(
 # Note: This name is registered in gcal-weather-service.c.
 desktop_conf = configuration_data()
 desktop_conf.set('icon', application_id)
+desktop_conf.set('binary', calendar_binary)
 desktop = i18n.merge_file(
   type: 'desktop',
   input: configure_file(
@@ -35,7 +36,7 @@ desktop = i18n.merge_file(
 # GNOME Shell search provider
 search_provider_conf = configuration_data()
 search_provider_conf.set('appid', application_id)
-search_provider_conf.set('profile',  profile)
+search_provider_conf.set('objectpath', '/' + application_id.replace('.', '/') + '/SearchProvider')
 configure_file(
   configuration: search_provider_conf,
   input: files('org.gnome.Calendar.search-provider.ini.in'),
@@ -46,12 +47,12 @@ configure_file(
 # GSettings schema
 schema_conf = configuration_data()
 schema_conf.set('GETTEXT_PACKAGE', meson.project_name())
-
-schema = 'org.gnome.calendar.gschema.xml'
+schema_conf.set('appid', application_id)
+schema_conf.set('schemapath', '/' + application_id.replace('.', '/') + '/')
 
 schema_xml = configure_file(
-  input: schema + '.in',
-  output: schema,
+  input: 'org.gnome.calendar.gschema.xml.in',
+  output: application_id + '.gschema.xml',
   install: true,
   install_dir: calendar_schemadir,
   configuration: schema_conf
@@ -72,6 +73,7 @@ compiled_schemas = custom_target(
 service_conf = configuration_data()
 service_conf.set('appid', application_id)
 service_conf.set('bindir', calendar_bindir)
+service_conf.set('binary', calendar_binary)
 service = 'org.gnome.Calendar.service'
 
 configure_file(

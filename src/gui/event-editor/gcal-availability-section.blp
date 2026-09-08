@@ -1,0 +1,37 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $GcalAvailabilitySection: $GcalEventEditorSection {
+  title: _("Availability and Visibility");
+
+  Adw.ComboRow availability_row {
+    title: _("Show Me As");
+    subtitle: _("Free events do not block your availability");
+    sensitive: bind template.dialog as <$GcalEventEditorDialog>.writable;
+
+    model: StringList {
+      strings [
+        _("Busy"),
+        _("Free"),
+      ]
+    };
+
+    notify::selected => $on_availability_changed_cb(template);
+  }
+
+  Adw.ComboRow visibility_row {
+    title: _("Visibility");
+    subtitle: _("Control who can see the event details");
+    sensitive: bind template.dialog as <$GcalEventEditorDialog>.writable;
+
+    model: StringList {
+      strings [
+        _("Default Visibility"),
+        _("Public"),
+        _("Private"),
+      ]
+    };
+
+    notify::selected => $on_visibility_changed_cb(template);
+  }
+}

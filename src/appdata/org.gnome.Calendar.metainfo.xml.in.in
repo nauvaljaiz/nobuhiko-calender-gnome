@@ -6,14 +6,18 @@
 
   <id>@appid@</id>
 
-  <developer id="org.gnome">
-    <name>The GNOME Project</name>
+  <developer id="local.nobuhiko">
+    <name>Nobuhiko Calendar contributors</name>
   </developer>
 
-  <name>Calendar</name>
+  <name>Nobuhiko Calendar</name>
   <summary>Manage your schedule</summary>
 
   <description>
+    <p>
+      Nobuhiko Calendar is an experimental independent fork of GNOME Calendar that adds deeper
+      Google Calendar compatibility while keeping a fast, adaptive native Linux interface.
+    </p>
     <p>
       GNOME Calendar is an elegant tool to help you plan and stay on top of your schedule for
       upcoming days and weeks, whether your months are filled with meetings and appointments,
@@ -81,14 +85,7 @@
     <color type="primary" scheme_preference="dark">#613583</color>
   </branding>
 
-  <url type="homepage">https://apps.gnome.org/Calendar/</url>
-  <url type="bugtracker">https://gitlab.gnome.org/GNOME/gnome-calendar/issues</url>
-  <url type="donation">https://www.gnome.org/donate/</url>
-  <url type="vcs-browser">https://gitlab.gnome.org/GNOME/gnome-calendar</url>
-  <url type="translate">https://l10n.gnome.org/module/gnome-calendar/</url>
-  <url type="contribute">https://welcome.gnome.org/app/Calendar/</url>
-  <url type="contact">https://matrix.to/#/#gnome-calendar:gnome.org</url>
-  <project_group>GNOME</project_group>
+  <url type="homepage">https://gitlab.gnome.org/GNOME/gnome-calendar</url>
 
   <requires>
     <display_length compare="ge">360</display_length>
@@ -107,14 +104,23 @@
   <translation type="gettext">gnome-calendar</translation>
   <launchable type="desktop-id">@appid@.desktop</launchable>
   <provides>
-    <binary>gnome-calendar</binary>
+    <binary>nobuhiko-calendar</binary>
   </provides>
 
   <content_rating type="oars-1.1" />
 
-  <update_contact>gbsneto@gnome.org</update_contact>
-
   <releases>
+    <release date="2026-09-09" version="51.0-nobuhiko.1" type="development">
+      <description>
+        <ul>
+          <li>Isolate the fork's application identity from GNOME Calendar</li>
+          <li>Add Busy and Free event availability</li>
+          <li>Add Default, Public, and Private event visibility</li>
+        </ul>
+      </description>
+    </release>
+
+    <!-- Upstream GNOME Calendar release history retained in the source for attribution.
     <release date="2026-08-28" version="51~rc" type="development" />
     <release date="2026-07-25" version="51~beta" type="development" />
     <release date="2026-06-29" version="51~alpha" type="development" />
@@ -575,5 +581,6 @@
         <p>Thanks to all the contributors that worked on GNOME Calendar!</p>
       </description>
     </release>
+    -->
   </releases>
 </component>

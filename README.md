@@ -1,32 +1,47 @@
-<div align="center">
-  <img src="data/icons/hicolor/scalable/apps/org.gnome.Calendar.svg" width="128" height="128">
+# Nobuhiko Calendar
 
-  # GNOME Calendar
+Nobuhiko Calendar is an experimental native Linux calendar based on GNOME
+Calendar. It keeps the GTK 4, libadwaita, and Evolution Data Server foundation
+while adding deeper Google Calendar compatibility in small, testable stages.
 
-  Manage your schedule
+The current development build uses the application ID
+`local.nobuhiko.Calendar.Devel`, so it can be installed beside GNOME Calendar.
+The first fork features add event controls for **Busy/Free** availability and
+**Default/Public/Private** visibility.
 
-  <img width="922" src="https://static.gnome.org/appdata/gnome-50/org.gnome.Calendar/month-view.png">
-</div>
+## Project plan
 
-## Installation
+- [Feature audit](docs/AUDIT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Roadmap](docs/ROADMAP.md)
+- [Validation record](docs/VALIDATION.md)
 
-[![Flatpak](https://flathub.org/api/badge?svg&locale=en)](https://flathub.org/apps/details/org.gnome.Calendar)
+## Build
 
-## Links
+The project uses Meson. GNOME Builder is the recommended development
+environment because it can build the supplied Flatpak manifest and provide the
+required GNOME platform dependencies.
 
-- Homepage: [apps.gnome.org/Calendar]
-- Report an issue: [gitlab.gnome.org/GNOME/gnome-calendar/issues]
-- Donate: [donate.gnome.org]
-- Translate: [l10n.gnome.org/module/gnome-calendar]
-- Contact: [matrix.to/#/#gnome-calendar:gnome.org]
+For a host build with the development packages installed:
 
-## Contributing
+```sh
+meson setup _build -Dprofile=development
+meson compile -C _build
+meson test -C _build --print-errorlogs
+```
 
-For information on how to contribute, please check [CONTRIBUTING.md](CONTRIBUTING.md) and [HACKING.md](HACKING.md).
+Run the development binary with the build-time settings schema:
 
+```sh
+GSETTINGS_SCHEMA_DIR="$PWD/_build/data" _build/src/nobuhiko-calendar
+```
 
-[apps.gnome.org/Calendar]: https://apps.gnome.org/Calendar
-[gitlab.gnome.org/GNOME/gnome-calendar/issues]: https://gitlab.gnome.org/GNOME/gnome-calendar/issues/
-[donate.gnome.org]: https://donate.gnome.org/
-[l10n.gnome.org/module/gnome-calendar]: https://l10n.gnome.org/module/gnome-calendar/
-[matrix.to/#/#gnome-calendar:gnome.org]: https://matrix.to/#/#gnome-calendar:gnome.org/
+## Upstream and license
+
+This is an independent fork of
+[GNOME Calendar](https://gitlab.gnome.org/GNOME/gnome-calendar), currently based
+on version 51.0. GNOME Calendar and this fork are licensed under GPL-3.0-or-later.
+The existing icon artwork and translations retain their upstream attribution.
+Changes made for this fork should be reviewed and distributed as fork changes;
+the upstream project has its own contribution policy in
+[CONTRIBUTING.md](CONTRIBUTING.md).

@@ -20,6 +20,7 @@
 
 #define G_LOG_DOMAIN "GcalContext"
 
+#include "config.h"
 #include "gcal-context.h"
 #include "gcal-time-zone-monitor.h"
 
@@ -307,7 +308,7 @@ gcal_context_init (GcalContext *self)
   g_autoptr (GError) error = NULL;
 
   self->clock = gcal_clock_new ();
-  self->settings = g_settings_new ("org.gnome.calendar");
+  self->settings = g_settings_new (APPLICATION_ID);
   self->weather_service = gcal_weather_service_new ();
   self->time_format = GCAL_TIME_FORMAT_24H;
 

@@ -85,6 +85,20 @@
                                    "RECURRENCE-ID:20180714T000000Z\n" \
                                    "END:VEVENT\n"
 
+#define STUB_EVENT_WITH_METADATA "BEGIN:VEVENT\n"                                      \
+                                 "SUMMARY:Planning\n"                         \
+                                 "UID:availability@example.test\n"            \
+                                 "DTSTAMP:20260907T000000Z\n"                 \
+                                 "DTSTART;TZID=Asia/Jakarta:20260907T090000\n" \
+                                 "DTEND;TZID=Asia/Jakarta:20260907T100000\n"   \
+                                 "RRULE:FREQ=WEEKLY;COUNT=3\n"                 \
+                                 "ORGANIZER:mailto:owner@example.test\n"       \
+                                 "ATTENDEE:mailto:guest@example.test\n"        \
+                                 "CLASS:PRIVATE\n"                            \
+                                 "ATTACH:https://example.test/file\n"          \
+                                 "X-NOBUHIKO-KEEP:preserved\n"                \
+                                 "END:VEVENT\n"
+
 /*
  * Auxiliary methods
  */
@@ -164,6 +178,168 @@ event_summary (void)
   event = create_event_for_string (STUB_EVENT, NULL);
 
   g_assert_cmpstr (gcal_event_get_summary (event), ==, "Stub event");
+}
+
+/*********************************************************************************************************************/
+
+static void
+event_availability (void)
+{
+  g_autoptr (GcalEvent) event = create_event_for_string (STUB_EVENT, NULL);
+  g_autoptr (GcalEvent) free_event = NULL;
+  g_autofree gchar *before = NULL;
+  g_autofree gchar *after = NULL;
+  ICalComponent *ical_component;
+
+  ical_component = e_cal_component_get_icalcomponent (gcal_event_get_component (event));
+  before = i_cal_component_as_ical_string (ical_component);
+
+  g_assert_true (gcal_event_get_busy (event));
+  gcal_event_set_busy (event, TRUE);
+  after = i_cal_component_as_ical_string (ical_component);
+  g_assert_cmpstr (before, ==, after);
+
+  gcal_event_set_busy (event, FALSE);
+  g_assert_false (gcal_event_get_busy (event));
+  g_assert_cmpint (e_cal_component_get_transparency (gcal_event_get_component (event)),
+                   ==,
+                   E_CAL_COMPONENT_TRANSP_TRANSPARENT);
+
+  free_event = gcal_event_new_from_event (event);
+  g_assert_true (gcal_event_availability_equal (event, free_event));
+
+  gcal_event_set_busy (free_event, TRUE);
+  g_assert_true (gcal_event_get_busy (free_event));
+  g_assert_false (gcal_event_availability_equal (event, free_event));
+  g_assert_false (gcal_event_get_busy (event));
+}
+
+/*********************************************************************************************************************/
+
+static void
+event_availability_preserves_metadata (void)
+{
+  g_autoptr (GcalEvent) event = create_event_for_string (STUB_EVENT_WITH_METADATA, NULL);
+  g_autofree gchar *serialized = NULL;
+
+  gcal_event_set_busy (event, FALSE);
+  serialized = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (event)));
+
+  g_assert_nonnull (strstr (serialized, "TRANSP:TRANSPARENT"));
+  g_assert_nonnull (strstr (serialized, "RRULE:FREQ=WEEKLY;COUNT=3"));
+  g_assert_nonnull (strstr (serialized, "ORGANIZER:mailto:owner@example.test"));
+  g_assert_nonnull (strstr (serialized, "ATTENDEE:mailto:guest@example.test"));
+  g_assert_nonnull (strstr (serialized, "CLASS:PRIVATE"));
+  g_assert_nonnull (strstr (serialized, "ATTACH:https://example.test/file"));
+  g_assert_nonnull (strstr (serialized, "X-NOBUHIKO-KEEP:preserved"));
+}
+
+/*********************************************************************************************************************/
+
+static void
+event_visibility (void)
+{
+  g_autoptr (GcalEvent) event = create_event_for_string (STUB_EVENT, NULL);
+  g_autoptr (GcalEvent) public_event = NULL;
+  g_autofree gchar *before = NULL;
+  g_autofree gchar *after = NULL;
+  ICalComponent *ical_component;
+
+  ical_component = e_cal_component_get_icalcomponent (gcal_event_get_component (event));
+  before = i_cal_component_as_ical_string (ical_component);
+
+  g_assert_cmpint (gcal_event_get_visibility (event), ==, GCAL_EVENT_VISIBILITY_DEFAULT);
+  gcal_event_set_visibility (event, GCAL_EVENT_VISIBILITY_DEFAULT);
+  after = i_cal_component_as_ical_string (ical_component);
+  g_assert_cmpstr (before, ==, after);
+
+  gcal_event_set_visibility (event, GCAL_EVENT_VISIBILITY_PUBLIC);
+  g_assert_cmpint (gcal_event_get_visibility (event), ==, GCAL_EVENT_VISIBILITY_PUBLIC);
+  g_assert_cmpint (e_cal_component_get_classification (gcal_event_get_component (event)),
+                   ==,
+                   E_CAL_COMPONENT_CLASS_PUBLIC);
+
+  public_event = gcal_event_new_from_event (event);
+  g_assert_true (gcal_event_visibility_equal (event, public_event));
+
+  gcal_event_set_visibility (public_event, GCAL_EVENT_VISIBILITY_PRIVATE);
+  g_assert_cmpint (gcal_event_get_visibility (public_event), ==, GCAL_EVENT_VISIBILITY_PRIVATE);
+  g_assert_false (gcal_event_visibility_equal (event, public_event));
+  g_assert_cmpint (gcal_event_get_visibility (event), ==, GCAL_EVENT_VISIBILITY_PUBLIC);
+
+  gcal_event_set_visibility (public_event, GCAL_EVENT_VISIBILITY_DEFAULT);
+  g_assert_cmpint (e_cal_component_get_classification (gcal_event_get_component (public_event)),
+                   ==,
+                   E_CAL_COMPONENT_CLASS_NONE);
+}
+
+/*********************************************************************************************************************/
+
+static void
+event_visibility_preserves_special_values (void)
+{
+  const gchar *confidential_ical =
+    "BEGIN:VEVENT\n"
+    "SUMMARY:Confidential event\n"
+    "UID:confidential@example.test\n"
+    "DTSTART:20260909T090000Z\n"
+    "DTEND:20260909T100000Z\n"
+    "CLASS:CONFIDENTIAL\n"
+    "END:VEVENT\n";
+  const gchar *unknown_ical =
+    "BEGIN:VEVENT\n"
+    "SUMMARY:Imported event\n"
+    "UID:unknown-class@example.test\n"
+    "DTSTART:20260909T090000Z\n"
+    "DTEND:20260909T100000Z\n"
+    "CLASS:X-NOBUHIKO-CUSTOM\n"
+    "END:VEVENT\n";
+  g_autoptr (GcalEvent) confidential = create_event_for_string (confidential_ical, NULL);
+  g_autoptr (GcalEvent) private_event = create_event_for_string (STUB_EVENT_WITH_METADATA, NULL);
+  g_autoptr (GcalEvent) unknown = create_event_for_string (unknown_ical, NULL);
+  g_autofree gchar *confidential_before = NULL;
+  g_autofree gchar *confidential_after = NULL;
+  g_autofree gchar *unknown_before = NULL;
+  g_autofree gchar *unknown_after = NULL;
+
+  confidential_before = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (confidential)));
+  g_assert_cmpint (gcal_event_get_visibility (confidential), ==, GCAL_EVENT_VISIBILITY_PRIVATE);
+  g_assert_true (gcal_event_visibility_equal (confidential, private_event));
+  gcal_event_set_visibility (confidential, GCAL_EVENT_VISIBILITY_PRIVATE);
+  confidential_after = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (confidential)));
+  g_assert_cmpstr (confidential_before, ==, confidential_after);
+  g_assert_nonnull (strstr (confidential_after, "CLASS:CONFIDENTIAL"));
+
+  unknown_before = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (unknown)));
+  g_assert_cmpint (gcal_event_get_visibility (unknown), ==, GCAL_EVENT_VISIBILITY_DEFAULT);
+  gcal_event_set_visibility (unknown, GCAL_EVENT_VISIBILITY_DEFAULT);
+  unknown_after = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (unknown)));
+  g_assert_cmpstr (unknown_before, ==, unknown_after);
+}
+
+/*********************************************************************************************************************/
+
+static void
+event_visibility_preserves_metadata (void)
+{
+  g_autoptr (GcalEvent) event = create_event_for_string (STUB_EVENT_WITH_METADATA, NULL);
+  g_autofree gchar *serialized = NULL;
+
+  gcal_event_set_visibility (event, GCAL_EVENT_VISIBILITY_PUBLIC);
+  serialized = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (event)));
+
+  g_assert_nonnull (strstr (serialized, "CLASS:PUBLIC"));
+  g_assert_nonnull (strstr (serialized, "RRULE:FREQ=WEEKLY;COUNT=3"));
+  g_assert_nonnull (strstr (serialized, "ORGANIZER:mailto:owner@example.test"));
+  g_assert_nonnull (strstr (serialized, "ATTENDEE:mailto:guest@example.test"));
+  g_assert_nonnull (strstr (serialized, "ATTACH:https://example.test/file"));
+  g_assert_nonnull (strstr (serialized, "X-NOBUHIKO-KEEP:preserved"));
 }
 
 /*********************************************************************************************************************/
@@ -587,6 +763,11 @@ main (gint   argc,
   g_test_add_func ("/event/clone", event_clone);
   g_test_add_func ("/event/uid", event_uid);
   g_test_add_func ("/event/summary", event_summary);
+  g_test_add_func ("/event/availability", event_availability);
+  g_test_add_func ("/event/availability/preserves-metadata", event_availability_preserves_metadata);
+  g_test_add_func ("/event/visibility", event_visibility);
+  g_test_add_func ("/event/visibility/preserves-special-values", event_visibility_preserves_special_values);
+  g_test_add_func ("/event/visibility/preserves-metadata", event_visibility_preserves_metadata);
   g_test_add_func ("/event/nodtend", event_no_dtend);
   g_test_add_func ("/event/date/start", event_date_start);
   g_test_add_func ("/event/date/end", event_date_end);

@@ -1,6 +1,6 @@
 [Shell Search Provider]
-Icon=gnome-calendar
+Icon=@appid@
 DesktopId=@appid@.desktop
 BusName=@appid@
-ObjectPath=/org/gnome/Calendar@profile@/SearchProvider
+ObjectPath=@objectpath@
 Version=2

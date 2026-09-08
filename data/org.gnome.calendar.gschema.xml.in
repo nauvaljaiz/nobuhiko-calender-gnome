@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist gettext-domain="@GETTEXT_PACKAGE@">
-  <schema id="org.gnome.calendar" path="/org/gnome/calendar/">
+  <schema id="@appid@" path="@schemapath@">
     <key name="window-maximized" type="b">
       <default>true</default>
       <summary>Window maximized</summary>
@@ -11,7 +11,7 @@
       <summary>Window size</summary>
       <description>Window size (width and height).</description>
     </key>
-    <key name="active-view" enum="org.gnome.calendar.GcalWindowView">
+    <key name="active-view" enum="@appid@.GcalWindowView">
       <default>'month'</default>
       <summary>Type of the active view</summary>
       <description>Type of the active window view, default value is: monthly view</description>

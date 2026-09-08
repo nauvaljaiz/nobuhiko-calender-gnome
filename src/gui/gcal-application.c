@@ -238,9 +238,8 @@ gcal_application_show_about (GSimpleAction *simple,
   adw_about_dialog_set_copyright (ADW_ABOUT_DIALOG (about), copyright);
   adw_about_dialog_set_developers (ADW_ABOUT_DIALOG (about), developers);
   adw_about_dialog_set_debug_info (ADW_ABOUT_DIALOG (about), troubleshooting);
-  adw_about_dialog_set_debug_info_filename (ADW_ABOUT_DIALOG (about), "Calendar.txt");
+  adw_about_dialog_set_debug_info_filename (ADW_ABOUT_DIALOG (about), "Nobuhiko-Calendar.txt");
   adw_about_dialog_set_translator_credits (ADW_ABOUT_DIALOG (about), _("translator-credits"));
-  adw_about_dialog_set_support_url (ADW_ABOUT_DIALOG (about), "https://discourse.gnome.org/tag/calendar");
 
   weather_service = gcal_context_get_weather_service (self->context);
   adw_about_dialog_add_legal_section (ADW_ABOUT_DIALOG (about),
@@ -513,7 +512,7 @@ gcal_application_handle_local_options (GApplication *app,
 
   if (show_version)
     {
-      g_print ("gnome-calendar: Version %s\n", PACKAGE_VERSION);
+      g_print ("nobuhiko-calendar: Version %s\n", PACKAGE_VERSION);
       return 0;
     }
 
@@ -538,7 +537,7 @@ gcal_application_dbus_register (GApplication     *application,
   if (!G_APPLICATION_CLASS (gcal_application_parent_class)->dbus_register (application, connection, object_path, error))
     GCAL_RETURN (FALSE);
 
-  search_provider_path = g_strconcat (object_path, PROFILE, "/SearchProvider", NULL);
+  search_provider_path = g_strconcat (object_path, "/SearchProvider", NULL);
 
   if (!gcal_shell_search_provider_dbus_export (self->search_provider, connection, search_provider_path, error))
     GCAL_RETURN (FALSE);

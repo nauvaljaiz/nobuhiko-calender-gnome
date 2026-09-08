@@ -56,6 +56,10 @@ template $GcalEventEditorDialog: Adw.Dialog {
             dialog: template;
           }
 
+          $GcalAvailabilitySection {
+            dialog: template;
+          }
+
           $GcalRemindersSection {
             title: _("Reminders");
             sensitive: bind template.writable;

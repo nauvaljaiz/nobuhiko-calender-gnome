@@ -17,6 +17,7 @@ src/gui/common/gcal-calendar-row.c
 src/gui/common/gcal-date-chooser.blp
 src/gui/common/gcal-date-chooser.c
 src/gui/event-editor/gcal-alarm-row.blp
+src/gui/event-editor/gcal-availability-section.blp
 src/gui/event-editor/gcal-alarm-row.c
 src/gui/event-editor/gcal-attendee-row.blp
 src/gui/event-editor/gcal-attendee-row.c

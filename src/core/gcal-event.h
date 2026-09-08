@@ -43,6 +43,13 @@ typedef enum
   GCAL_EVENT_ERROR_INVALID_START_DATE
 } GcalEventError;
 
+typedef enum
+{
+  GCAL_EVENT_VISIBILITY_DEFAULT,
+  GCAL_EVENT_VISIBILITY_PUBLIC,
+  GCAL_EVENT_VISIBILITY_PRIVATE,
+} GcalEventVisibility;
+
 #define GCAL_EVENT_ERROR gcal_event_error_quark ()
 
 #define GCAL_TYPE_EVENT (gcal_event_get_type())
@@ -58,6 +65,16 @@ GcalEvent*           gcal_event_new                              (GcalCalendar  
 GcalEvent*           gcal_event_new_from_event                   (GcalEvent          *self);
 
 gboolean             gcal_event_get_all_day                      (GcalEvent          *self);
+
+gboolean             gcal_event_get_busy                         (GcalEvent          *self);
+
+void                 gcal_event_set_busy                         (GcalEvent          *self,
+                                                                  gboolean            busy);
+
+GcalEventVisibility  gcal_event_get_visibility                   (GcalEvent          *self);
+
+void                 gcal_event_set_visibility                   (GcalEvent          *self,
+                                                                  GcalEventVisibility visibility);
 
 void                 gcal_event_set_all_day                      (GcalEvent          *self,
                                                                   gboolean            all_day);
@@ -143,6 +160,12 @@ GListModel *         gcal_event_get_attendees                    (GcalEvent     
 GcalEventOrganizer * gcal_event_get_organizer                    (GcalEvent          *self);
 
 gboolean             gcal_event_alarms_equal                     (GcalEvent          *event1,
+                                                                  GcalEvent          *event2);
+
+gboolean             gcal_event_availability_equal               (GcalEvent          *event1,
+                                                                  GcalEvent          *event2);
+
+gboolean             gcal_event_visibility_equal                 (GcalEvent          *event1,
                                                                   GcalEvent          *event2);
 
 gboolean             gcal_event_schedule_equal                   (GcalEvent          *event1,

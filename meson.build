@@ -25,7 +25,8 @@ calendar_prefix = get_option('prefix')
 calendar_bindir = calendar_prefix / get_option('bindir')
 calendar_localedir = calendar_prefix / get_option('localedir')
 calendar_datadir = calendar_prefix / get_option('datadir')
-calendar_pkgdatadir = calendar_datadir / meson.project_name()
+calendar_binary = 'nobuhiko-calendar'
+calendar_pkgdatadir = calendar_datadir / calendar_binary
 calendar_schemadir = calendar_datadir / 'glib-2.0' / 'schemas'
 
 
@@ -46,9 +47,9 @@ else
 endif
 
 if profile == ''
-  application_id = 'org.gnome.Calendar'
+  application_id = 'local.nobuhiko.Calendar'
 else
-  application_id = 'org.gnome.Calendar.@0@'.format(profile)
+  application_id = 'local.nobuhiko.Calendar.@0@'.format(profile)
 endif
 calendar_buildtype = get_option('buildtype')
 development_release = calendar_minor_version.startswith('alpha') or \

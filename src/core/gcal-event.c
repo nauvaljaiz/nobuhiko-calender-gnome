@@ -882,6 +882,116 @@ gcal_event_get_all_day (GcalEvent *self)
 }
 
 /**
+ * gcal_event_get_busy:
+ * @self: a #GcalEvent
+ *
+ * Returns whether the event blocks time. An absent or unknown TRANSP value is
+ * treated as opaque, which is the default defined by RFC 5545.
+ *
+ * Returns: %FALSE only for an explicitly transparent event
+ */
+gboolean
+gcal_event_get_busy (GcalEvent *self)
+{
+  g_return_val_if_fail (GCAL_IS_EVENT (self), TRUE);
+
+  return e_cal_component_get_transparency (self->component) != E_CAL_COMPONENT_TRANSP_TRANSPARENT;
+}
+
+/**
+ * gcal_event_set_busy:
+ * @self: a #GcalEvent
+ * @busy: whether the event blocks time
+ *
+ * Changes the iCalendar TRANSP property only when the effective availability
+ * changes. This preserves an absent or unknown property during unrelated edits.
+ */
+void
+gcal_event_set_busy (GcalEvent *self,
+                     gboolean   busy)
+{
+  g_return_if_fail (GCAL_IS_EVENT (self));
+
+  busy = !!busy;
+  if (gcal_event_get_busy (self) == busy)
+    return;
+
+  e_cal_component_set_transparency (self->component,
+                                    busy ? E_CAL_COMPONENT_TRANSP_OPAQUE : E_CAL_COMPONENT_TRANSP_TRANSPARENT);
+}
+
+/**
+ * gcal_event_get_visibility:
+ * @self: a #GcalEvent
+ *
+ * Returns the effective visibility exposed by the editor. Confidential events
+ * are treated as private, while absent and unknown values use the calendar
+ * default.
+ *
+ * Returns: the effective #GcalEventVisibility
+ */
+GcalEventVisibility
+gcal_event_get_visibility (GcalEvent *self)
+{
+  g_return_val_if_fail (GCAL_IS_EVENT (self), GCAL_EVENT_VISIBILITY_DEFAULT);
+
+  switch (e_cal_component_get_classification (self->component))
+    {
+    case E_CAL_COMPONENT_CLASS_PUBLIC:
+      return GCAL_EVENT_VISIBILITY_PUBLIC;
+
+    case E_CAL_COMPONENT_CLASS_PRIVATE:
+    case E_CAL_COMPONENT_CLASS_CONFIDENTIAL:
+      return GCAL_EVENT_VISIBILITY_PRIVATE;
+
+    case E_CAL_COMPONENT_CLASS_NONE:
+    case E_CAL_COMPONENT_CLASS_UNKNOWN:
+    default:
+      return GCAL_EVENT_VISIBILITY_DEFAULT;
+    }
+}
+
+/**
+ * gcal_event_set_visibility:
+ * @self: a #GcalEvent
+ * @visibility: the requested visibility
+ *
+ * Changes CLASS only when the effective visibility changes. This preserves
+ * confidential and unknown values during unrelated edits.
+ */
+void
+gcal_event_set_visibility (GcalEvent           *self,
+                           GcalEventVisibility  visibility)
+{
+  ECalComponentClassification classification;
+
+  g_return_if_fail (GCAL_IS_EVENT (self));
+  g_return_if_fail (visibility >= GCAL_EVENT_VISIBILITY_DEFAULT &&
+                    visibility <= GCAL_EVENT_VISIBILITY_PRIVATE);
+
+  if (gcal_event_get_visibility (self) == visibility)
+    return;
+
+  switch (visibility)
+    {
+    case GCAL_EVENT_VISIBILITY_PUBLIC:
+      classification = E_CAL_COMPONENT_CLASS_PUBLIC;
+      break;
+
+    case GCAL_EVENT_VISIBILITY_PRIVATE:
+      classification = E_CAL_COMPONENT_CLASS_PRIVATE;
+      break;
+
+    case GCAL_EVENT_VISIBILITY_DEFAULT:
+    default:
+      classification = E_CAL_COMPONENT_CLASS_NONE;
+      break;
+    }
+
+  e_cal_component_set_classification (self->component, classification);
+}
+
+/**
  * gcal_event_get_color:
  * @self: a #GcalEvent
  *
@@ -1724,6 +1834,44 @@ gcal_event_alarms_equal (GcalEvent *event1,
     }
 
   GCAL_RETURN (TRUE);
+}
+
+/**
+ * gcal_event_availability_equal:
+ * @event1: a #GcalEvent
+ * @event2: a #GcalEvent
+ *
+ * Checks whether both events block availability in the same way.
+ *
+ * Returns: %TRUE if both events have the same effective availability
+ */
+gboolean
+gcal_event_availability_equal (GcalEvent *event1,
+                               GcalEvent *event2)
+{
+  g_return_val_if_fail (GCAL_IS_EVENT (event1), FALSE);
+  g_return_val_if_fail (GCAL_IS_EVENT (event2), FALSE);
+
+  return gcal_event_get_busy (event1) == gcal_event_get_busy (event2);
+}
+
+/**
+ * gcal_event_visibility_equal:
+ * @event1: a #GcalEvent
+ * @event2: a #GcalEvent
+ *
+ * Checks whether both events have the same effective visibility.
+ *
+ * Returns: %TRUE if both events have the same effective visibility
+ */
+gboolean
+gcal_event_visibility_equal (GcalEvent *event1,
+                             GcalEvent *event2)
+{
+  g_return_val_if_fail (GCAL_IS_EVENT (event1), FALSE);
+  g_return_val_if_fail (GCAL_IS_EVENT (event2), FALSE);
+
+  return gcal_event_get_visibility (event1) == gcal_event_get_visibility (event2);
 }
 
 /**
