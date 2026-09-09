@@ -44,10 +44,23 @@ struct _GcalScheduleSection
   GcalDateChooserRow  *end_date_row;
   GcalDateTimeChooser *start_date_time_chooser;
   GcalDateTimeChooser *end_date_time_chooser;
+  GtkToggleButton     *friday_button;
+  GtkWidget           *imported_recurrence_row;
+  GtkToggleButton     *monday_button;
+  GtkWidget           *monthly_pattern_combo;
   GtkWidget           *number_of_occurrences_spin;
   GtkWidget           *repeat_combo;
   GtkWidget           *repeat_duration_combo;
+  GtkWidget           *repeat_interval_row;
+  GtkWidget           *repeat_interval_spin;
+  GtkLabel            *repeat_interval_unit_label;
+  GtkToggleButton     *saturday_button;
+  GtkToggleButton     *sunday_button;
+  GtkToggleButton     *thursday_button;
+  GtkToggleButton     *tuesday_button;
   GtkWidget           *until_date_selector;
+  GtkToggleButton     *wednesday_button;
+  GtkWidget           *weekday_row;
 };
 
 /* Desired state of the widgets, computed from GcalEventSchedule.
@@ -74,8 +87,18 @@ typedef struct
     gboolean duration_combo_visible;
     gboolean number_of_occurrences_visible;
     gboolean until_date_visible;
+    gboolean interval_visible;
+    gboolean weekdays_visible;
+    gboolean monthly_pattern_visible;
+    gboolean imported_visible;
     GcalRecurrenceFrequency frequency;
     GcalRecurrenceLimitType limit_type;
+    GcalRecurrenceMonthlyPattern monthly_pattern;
+    guint interval;
+    guint week_days;
+    gint month_day;
+    gint month_week;
+    GDateWeekday month_weekday;
     guint limit_count;
     GDateTime *limit_until;
   } recurrence;
@@ -109,6 +132,18 @@ static void          on_schedule_type_changed_cb                 (GtkWidget     
 
 static void          on_number_of_occurrences_changed_cb         (GcalScheduleSection *self);
 static void          on_until_date_changed_cb                    (GcalScheduleSection *self);
+static void          on_repeat_duration_changed_cb               (GtkWidget           *widget,
+                                                                  GParamSpec          *pspec,
+                                                                  GcalScheduleSection *self);
+static void          on_repeat_type_changed_cb                   (GtkWidget           *widget,
+                                                                  GParamSpec          *pspec,
+                                                                  GcalScheduleSection *self);
+static void          on_repeat_interval_changed_cb               (GcalScheduleSection *self);
+static void          on_monthly_pattern_changed_cb               (GtkWidget           *widget,
+                                                                  GParamSpec          *pspec,
+                                                                  GcalScheduleSection *self);
+static void          on_weekday_toggled_cb                       (GtkToggleButton      *button,
+                                                                  GcalScheduleSection *self);
 
 static WidgetState *
 widget_state_from_values (const GcalEventSchedule *values)
@@ -159,11 +194,30 @@ widget_state_from_values (const GcalEventSchedule *values)
 
   if (values->curr.recur && values->curr.recur->frequency != GCAL_RECURRENCE_NO_REPEAT)
     {
-      state->recurrence.duration_combo_visible = TRUE;
       state->recurrence.frequency = values->curr.recur->frequency;
       state->recurrence.limit_type = values->curr.recur->limit_type;
+      state->recurrence.imported_visible = values->curr.recur->frequency == GCAL_RECURRENCE_OTHER;
+      state->recurrence.duration_combo_visible = !state->recurrence.imported_visible;
+      state->recurrence.interval_visible = !state->recurrence.imported_visible;
+      state->recurrence.weekdays_visible = values->curr.recur->frequency == GCAL_RECURRENCE_WEEKLY ||
+                                           values->curr.recur->frequency == GCAL_RECURRENCE_MON_FRI;
+      state->recurrence.monthly_pattern_visible = values->curr.recur->frequency == GCAL_RECURRENCE_MONTHLY;
+      state->recurrence.interval = values->curr.recur->interval;
+      state->recurrence.week_days = values->curr.recur->week_days;
+      state->recurrence.monthly_pattern = values->curr.recur->monthly_pattern;
+      state->recurrence.month_day = values->curr.recur->month_day;
+      state->recurrence.month_week = values->curr.recur->month_week;
+      state->recurrence.month_weekday = values->curr.recur->month_weekday;
 
-      switch (values->curr.recur->limit_type)
+      if (state->recurrence.weekdays_visible && state->recurrence.week_days == 0 && values->curr.date_start)
+        state->recurrence.week_days = GCAL_RECURRENCE_WEEKDAY_MASK (g_date_time_get_day_of_week (values->curr.date_start));
+
+      if (state->recurrence.monthly_pattern_visible &&
+          state->recurrence.monthly_pattern == GCAL_RECURRENCE_MONTHLY_DAY_OF_MONTH &&
+          state->recurrence.month_day == 0 && values->curr.date_start)
+        state->recurrence.month_day = g_date_time_get_day_of_month (values->curr.date_start);
+
+      switch (state->recurrence.imported_visible ? GCAL_RECURRENCE_FOREVER : values->curr.recur->limit_type)
         {
         case GCAL_RECURRENCE_COUNT:
           state->recurrence.limit_count = values->curr.recur->limit.count;
@@ -188,8 +242,18 @@ widget_state_from_values (const GcalEventSchedule *values)
       state->recurrence.duration_combo_visible = FALSE;
       state->recurrence.number_of_occurrences_visible = FALSE;
       state->recurrence.until_date_visible = FALSE;
+      state->recurrence.interval_visible = FALSE;
+      state->recurrence.weekdays_visible = FALSE;
+      state->recurrence.monthly_pattern_visible = FALSE;
+      state->recurrence.imported_visible = FALSE;
       state->recurrence.frequency = GCAL_RECURRENCE_NO_REPEAT;
       state->recurrence.limit_type = GCAL_RECURRENCE_FOREVER;
+      state->recurrence.monthly_pattern = GCAL_RECURRENCE_MONTHLY_DAY_OF_MONTH;
+      state->recurrence.interval = 1;
+      state->recurrence.week_days = 0;
+      state->recurrence.month_day = 0;
+      state->recurrence.month_week = 0;
+      state->recurrence.month_weekday = G_DATE_BAD_WEEKDAY;
       state->recurrence.limit_count = 0;
       state->recurrence.limit_until = NULL;
     }
@@ -244,7 +308,8 @@ unblock_date_signals (GcalScheduleSection *self)
 }
 
 static void
-remove_recurrence_properties (GcalEvent *event)
+remove_recurrence_properties (GcalEvent *event,
+                              gboolean   remove_exceptions)
 {
   ECalComponent *comp;
 
@@ -252,16 +317,138 @@ remove_recurrence_properties (GcalEvent *event)
 
   e_cal_component_set_recurid (comp, NULL);
   e_cal_component_set_rrules (comp, NULL);
+
+  if (remove_exceptions)
+    {
+      e_cal_component_set_rdates (comp, NULL);
+      e_cal_component_set_exrules (comp, NULL);
+      e_cal_component_set_exdates (comp, NULL);
+    }
+
   e_cal_component_commit_sequence (comp);
+}
+
+static GtkToggleButton *
+weekday_button (GcalScheduleSection *self,
+                GDateWeekday        day)
+{
+  switch (day)
+    {
+    case G_DATE_MONDAY:    return self->monday_button;
+    case G_DATE_TUESDAY:   return self->tuesday_button;
+    case G_DATE_WEDNESDAY: return self->wednesday_button;
+    case G_DATE_THURSDAY:  return self->thursday_button;
+    case G_DATE_FRIDAY:    return self->friday_button;
+    case G_DATE_SATURDAY:  return self->saturday_button;
+    case G_DATE_SUNDAY:    return self->sunday_button;
+    default: g_assert_not_reached ();
+    }
+}
+
+static void
+block_recurrence_signals (GcalScheduleSection *self)
+{
+  g_signal_handlers_block_by_func (self->repeat_combo, on_repeat_type_changed_cb, self);
+  g_signal_handlers_block_by_func (self->repeat_duration_combo, on_repeat_duration_changed_cb, self);
+  g_signal_handlers_block_by_func (self->repeat_interval_spin, on_repeat_interval_changed_cb, self);
+  g_signal_handlers_block_by_func (self->monthly_pattern_combo, on_monthly_pattern_changed_cb, self);
+
+  for (GDateWeekday day = G_DATE_MONDAY; day <= G_DATE_SUNDAY; day++)
+    g_signal_handlers_block_by_func (weekday_button (self, day), on_weekday_toggled_cb, self);
+}
+
+static void
+unblock_recurrence_signals (GcalScheduleSection *self)
+{
+  g_signal_handlers_unblock_by_func (self->repeat_combo, on_repeat_type_changed_cb, self);
+  g_signal_handlers_unblock_by_func (self->repeat_duration_combo, on_repeat_duration_changed_cb, self);
+  g_signal_handlers_unblock_by_func (self->repeat_interval_spin, on_repeat_interval_changed_cb, self);
+  g_signal_handlers_unblock_by_func (self->monthly_pattern_combo, on_monthly_pattern_changed_cb, self);
+
+  for (GDateWeekday day = G_DATE_MONDAY; day <= G_DATE_SUNDAY; day++)
+    g_signal_handlers_unblock_by_func (weekday_button (self, day), on_weekday_toggled_cb, self);
+}
+
+static const gchar *
+recurrence_unit (GcalRecurrenceFrequency frequency,
+                 guint                    interval)
+{
+  switch (frequency)
+    {
+    case GCAL_RECURRENCE_DAILY:
+      return ngettext ("day", "days", interval);
+    case GCAL_RECURRENCE_MON_FRI:
+    case GCAL_RECURRENCE_WEEKLY:
+      return ngettext ("week", "weeks", interval);
+    case GCAL_RECURRENCE_MONTHLY:
+      return ngettext ("month", "months", interval);
+    case GCAL_RECURRENCE_YEARLY:
+      return ngettext ("year", "years", interval);
+    default:
+      return "";
+    }
+}
+
+static const gchar *
+weekday_name (GDateWeekday weekday)
+{
+  switch (weekday)
+    {
+    case G_DATE_MONDAY:    return _("Monday");
+    case G_DATE_TUESDAY:   return _("Tuesday");
+    case G_DATE_WEDNESDAY: return _("Wednesday");
+    case G_DATE_THURSDAY:  return _("Thursday");
+    case G_DATE_FRIDAY:    return _("Friday");
+    case G_DATE_SATURDAY:  return _("Saturday");
+    case G_DATE_SUNDAY:    return _("Sunday");
+    default:               return "";
+    }
+}
+
+static const gchar *
+ordinal_name (gint position)
+{
+  switch (position)
+    {
+    case 1:  return _("First");
+    case 2:  return _("Second");
+    case 3:  return _("Third");
+    case 4:  return _("Fourth");
+    case 5:  return _("Fifth");
+    case -1: return _("Last");
+    default: return "";
+    }
+}
+
+static gchar *
+monthly_pattern_description (WidgetState *state)
+{
+  if (!state->recurrence.monthly_pattern_visible)
+    return NULL;
+
+  if (state->recurrence.monthly_pattern == GCAL_RECURRENCE_MONTHLY_DAY_OF_MONTH)
+    {
+      if (state->recurrence.month_day == -1)
+        return g_strdup (_("Last day of the month"));
+
+      return g_strdup_printf (_("Day %d"), state->recurrence.month_day);
+    }
+
+  return g_strdup_printf (_("%1$s %2$s"),
+                          ordinal_name (state->recurrence.month_week),
+                          weekday_name (state->recurrence.month_weekday));
 }
 
 static void
 update_widgets (GcalScheduleSection *self,
                 WidgetState         *state)
 {
+  g_autofree gchar *monthly_description = monthly_pattern_description (state);
+
   g_signal_handlers_block_by_func (self->schedule_type_stack, on_schedule_type_changed_cb, self);
   g_signal_handlers_block_by_func (self->number_of_occurrences_spin, on_number_of_occurrences_changed_cb, self);
   g_signal_handlers_block_by_func (self->until_date_selector, on_until_date_changed_cb, self);
+  block_recurrence_signals (self);
   block_date_signals (self);
 
   adw_view_stack_set_visible_child_name (self->schedule_type_stack,
@@ -285,9 +472,22 @@ update_widgets (GcalScheduleSection *self,
 
   /* Recurrences */
   gtk_widget_set_visible (self->repeat_duration_combo, state->recurrence.duration_combo_visible);
+  gtk_widget_set_visible (self->repeat_interval_row, state->recurrence.interval_visible);
+  gtk_widget_set_visible (self->weekday_row, state->recurrence.weekdays_visible);
+  gtk_widget_set_visible (self->monthly_pattern_combo, state->recurrence.monthly_pattern_visible);
+  gtk_widget_set_visible (self->imported_recurrence_row, state->recurrence.imported_visible);
 
   adw_combo_row_set_selected (ADW_COMBO_ROW (self->repeat_combo), state->recurrence.frequency);
   adw_combo_row_set_selected (ADW_COMBO_ROW (self->repeat_duration_combo), state->recurrence.limit_type);
+  adw_combo_row_set_selected (ADW_COMBO_ROW (self->monthly_pattern_combo), state->recurrence.monthly_pattern);
+  adw_action_row_set_subtitle (ADW_ACTION_ROW (self->monthly_pattern_combo), monthly_description);
+  gtk_spin_button_set_value (GTK_SPIN_BUTTON (self->repeat_interval_spin), state->recurrence.interval);
+  gtk_label_set_label (self->repeat_interval_unit_label,
+                       recurrence_unit (state->recurrence.frequency, state->recurrence.interval));
+
+  for (GDateWeekday day = G_DATE_MONDAY; day <= G_DATE_SUNDAY; day++)
+    gtk_toggle_button_set_active (weekday_button (self, day),
+                                  (state->recurrence.week_days & GCAL_RECURRENCE_WEEKDAY_MASK (day)) != 0);
 
   gtk_widget_set_visible (self->until_date_selector, state->recurrence.until_date_visible);
   if (state->recurrence.until_date_visible)
@@ -298,11 +498,11 @@ update_widgets (GcalScheduleSection *self,
   gtk_widget_set_visible (self->number_of_occurrences_spin, state->recurrence.number_of_occurrences_visible);
   if (state->recurrence.number_of_occurrences_visible)
     {
-      g_print ("update widgets: limit_count = %u\n", state->recurrence.limit_count);
       gtk_spin_button_set_value (GTK_SPIN_BUTTON (self->number_of_occurrences_spin), state->recurrence.limit_count);
     }
 
   unblock_date_signals (self);
+  unblock_recurrence_signals (self);
   g_signal_handlers_unblock_by_func (self->until_date_selector, on_until_date_changed_cb, self);
   g_signal_handlers_unblock_by_func (self->number_of_occurrences_spin, on_number_of_occurrences_changed_cb, self);
   g_signal_handlers_unblock_by_func (self->schedule_type_stack, on_schedule_type_changed_cb, self);
@@ -337,22 +537,18 @@ update_from_event_schedule (GcalScheduleSection *self,
   gcal_event_set_date_start (event, self->values->curr.date_start);
   gcal_event_set_date_end (event, self->values->curr.date_end);
 
-  /* Only apply the new recurrence if it's different from the old one.
-   * We don't unconditionally set the recurrence since remove_recurrence_properties()
-   * will actually remove all the rrules, not just *a* unique one.
-   *
-   * That is, here we allow for future support for more than one rrule
-   * in the event, given the current capabilities of gnome-calendar.
-   *
-   */
+  /* Keep the original recurrence properties byte-for-byte during unrelated
+   * edits. Replacing an imported rule deliberately clears recurrence parts
+   * that this editor cannot represent; editing a supported rule keeps EXDATE
+   * exceptions intact. */
   if (!gcal_recurrence_is_equal (self->values->curr.recur, gcal_event_get_recurrence (event)))
     {
-      remove_recurrence_properties (event);
+      GcalRecurrence *old_recur = gcal_event_get_recurrence (event);
+      gboolean replacing_imported = old_recur && old_recur->frequency == GCAL_RECURRENCE_OTHER;
 
-      if (self->values->curr.recur)
-        {
-          gcal_event_set_recurrence (event, self->values->curr.recur);
-        }
+      remove_recurrence_properties (event, replacing_imported || !self->values->curr.recur);
+
+      gcal_event_set_recurrence (event, self->values->curr.recur);
     }
 
   refresh (self);
@@ -431,6 +627,51 @@ on_until_date_changed_cb (GcalScheduleSection *self)
   update_from_event_schedule (self, updated);
 }
 
+static void
+on_repeat_interval_changed_cb (GcalScheduleSection *self)
+{
+  guint interval = gtk_spin_button_get_value_as_int (GTK_SPIN_BUTTON (self->repeat_interval_spin));
+  GcalEventSchedule *updated = gcal_event_schedule_set_recurrence_interval (self->values, interval);
+  update_from_event_schedule (self, updated);
+}
+
+static void
+on_monthly_pattern_changed_cb (GtkWidget           *widget,
+                               GParamSpec          *pspec,
+                               GcalScheduleSection *self)
+{
+  guint selected = adw_combo_row_get_selected (ADW_COMBO_ROW (self->monthly_pattern_combo));
+  GcalEventSchedule *updated;
+
+  g_assert (selected <= GCAL_RECURRENCE_MONTHLY_NTH_WEEKDAY);
+  updated = gcal_event_schedule_set_monthly_pattern (self->values, selected);
+  update_from_event_schedule (self, updated);
+}
+
+static void
+on_weekday_toggled_cb (GtkToggleButton      *button,
+                       GcalScheduleSection *self)
+{
+  guint week_days = 0;
+
+  for (GDateWeekday day = G_DATE_MONDAY; day <= G_DATE_SUNDAY; day++)
+    {
+      if (gtk_toggle_button_get_active (weekday_button (self, day)))
+        week_days |= GCAL_RECURRENCE_WEEKDAY_MASK (day);
+    }
+
+  if (week_days == 0)
+    {
+      g_signal_handlers_block_by_func (button, on_weekday_toggled_cb, self);
+      gtk_toggle_button_set_active (button, TRUE);
+      g_signal_handlers_unblock_by_func (button, on_weekday_toggled_cb, self);
+      return;
+    }
+
+  update_from_event_schedule (self,
+                              gcal_event_schedule_set_recurrence_week_days (self->values, week_days));
+}
+
 static GcalRecurrenceLimitType
 get_recurence_limit_type (GcalScheduleSection *self)
 {
@@ -456,7 +697,8 @@ on_repeat_duration_changed_cb (GtkWidget           *widget,
                                GParamSpec          *pspec,
                                GcalScheduleSection *self)
 {
-  if (get_recurrence_frequency (self) != GCAL_RECURRENCE_NO_REPEAT)
+  if (get_recurrence_frequency (self) != GCAL_RECURRENCE_NO_REPEAT &&
+      get_recurrence_frequency (self) != GCAL_RECURRENCE_OTHER)
     {
       GcalRecurrenceLimitType limit_type = get_recurence_limit_type (self);
       GcalEventSchedule *updated = gcal_event_schedule_set_recur_limit_type (self->values, limit_type);
@@ -470,7 +712,16 @@ on_repeat_type_changed_cb (GtkWidget           *widget,
                            GcalScheduleSection *self)
 {
   GcalRecurrenceFrequency frequency = get_recurrence_frequency (self);
-  GcalEventSchedule *updated = gcal_event_schedule_set_recur_frequency (self->values, frequency);
+  GcalEventSchedule *updated;
+
+  if (frequency == GCAL_RECURRENCE_OTHER &&
+      (!self->values->curr.recur || self->values->curr.recur->frequency != GCAL_RECURRENCE_OTHER))
+    {
+      refresh (self);
+      return;
+    }
+
+  updated = gcal_event_schedule_set_recur_frequency (self->values, frequency);
   update_from_event_schedule (self, updated);
 }
 
@@ -551,19 +802,35 @@ gcal_schedule_section_class_init (GcalScheduleSectionClass *klass)
   gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, end_date_row);
   gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, start_date_time_chooser);
   gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, end_date_time_chooser);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, friday_button);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, imported_recurrence_row);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, monday_button);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, monthly_pattern_combo);
   gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, number_of_occurrences_spin);
   gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, repeat_combo);
   gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, repeat_duration_combo);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, repeat_interval_row);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, repeat_interval_spin);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, repeat_interval_unit_label);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, saturday_button);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, sunday_button);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, thursday_button);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, tuesday_button);
   gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, until_date_selector);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, wednesday_button);
+  gtk_widget_class_bind_template_child (widget_class, GcalScheduleSection, weekday_row);
 
   gtk_widget_class_bind_template_callback (widget_class, on_start_date_changed_cb);
   gtk_widget_class_bind_template_callback (widget_class, on_end_date_changed_cb);
   gtk_widget_class_bind_template_callback (widget_class, on_start_date_time_changed_cb);
   gtk_widget_class_bind_template_callback (widget_class, on_end_date_time_changed_cb);
+  gtk_widget_class_bind_template_callback (widget_class, on_monthly_pattern_changed_cb);
   gtk_widget_class_bind_template_callback (widget_class, on_repeat_duration_changed_cb);
+  gtk_widget_class_bind_template_callback (widget_class, on_repeat_interval_changed_cb);
   gtk_widget_class_bind_template_callback (widget_class, on_repeat_type_changed_cb);
   gtk_widget_class_bind_template_callback (widget_class, on_number_of_occurrences_changed_cb);
   gtk_widget_class_bind_template_callback (widget_class, on_until_date_changed_cb);
+  gtk_widget_class_bind_template_callback (widget_class, on_weekday_toggled_cb);
 }
 
 static void
@@ -656,6 +923,7 @@ test_turning_on_recurrence_count_turns_on_its_widget (void)
 
   g_autoptr (WidgetState) state = widget_state_from_values (with_count);
   g_assert_true (state->recurrence.duration_combo_visible);
+  g_assert_true (state->recurrence.interval_visible);
   g_assert_true (state->recurrence.number_of_occurrences_visible);
   g_assert_false (state->recurrence.until_date_visible);
 }
@@ -678,8 +946,27 @@ test_turning_on_recurrence_until_turns_on_its_widget (void)
 
   g_autoptr (WidgetState) state = widget_state_from_values (with_until);
   g_assert_true (state->recurrence.duration_combo_visible);
+  g_assert_true (state->recurrence.interval_visible);
   g_assert_false (state->recurrence.number_of_occurrences_visible);
   g_assert_true (state->recurrence.until_date_visible);
+}
+
+static void
+test_imported_recurrence_only_shows_preservation_state (void)
+{
+  g_autoptr (GcalEventSchedule) values =
+    gcal_event_schedule_with_date_times ("20250411T10:00:00-06:00",
+                                         "20250411T11:30:00-06:00",
+                                         FALSE);
+  g_autoptr (GcalEventSchedule) imported =
+    gcal_event_schedule_set_recur_frequency (values, GCAL_RECURRENCE_OTHER);
+  g_autoptr (WidgetState) state = widget_state_from_values (imported);
+
+  g_assert_true (state->recurrence.imported_visible);
+  g_assert_false (state->recurrence.duration_combo_visible);
+  g_assert_false (state->recurrence.interval_visible);
+  g_assert_false (state->recurrence.weekdays_visible);
+  g_assert_false (state->recurrence.monthly_pattern_visible);
 }
 
 void
@@ -691,4 +978,6 @@ gcal_schedule_section_add_tests (void)
                    test_turning_on_recurrence_count_turns_on_its_widget);
   g_test_add_func ("/event_editor/schedule_section/turning_on_recurrence_until_turns_on_its_widget",
                    test_turning_on_recurrence_until_turns_on_its_widget);
+  g_test_add_func ("/event_editor/schedule_section/imported_recurrence_only_shows_preservation_state",
+                   test_imported_recurrence_only_shows_preservation_state);
 }

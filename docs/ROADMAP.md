@@ -18,7 +18,8 @@ existing test suite passes and unrelated event metadata survives round-trips.
 
 - [x] Busy/Free availability with iCalendar preservation tests.
 - [x] Default/Public/Private visibility with confidential and unknown-value preservation.
-- [ ] Custom recurrence rules, exceptions and end conditions.
+- [x] Custom recurrence intervals, weekdays, monthly patterns and end conditions,
+  with safe preservation of imported rules and `EXDATE` exceptions.
 - [x] Custom reminder offsets with safe preservation of imported alarm types.
 - [ ] Calendar-level default reminders and Google email reminder delivery.
 - [ ] Per-event color and generic attachments.
@@ -73,6 +74,6 @@ existing test suite passes and unrelated event metadata survives round-trips.
 
 ## Current next slice
 
-Add custom recurrence rules for intervals, weekdays, month positions, end
-conditions and exceptions while preserving recurrence properties the editor
-cannot represent.
+Add per-event color using provider-neutral iCalendar/EDS storage, then map it to
+Google event color IDs in the future provider adapter without losing unknown
+color metadata.

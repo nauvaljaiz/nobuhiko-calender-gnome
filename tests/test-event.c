@@ -143,6 +143,41 @@
                                          "END:VALARM\n"                 \
                                          "END:VEVENT\n"
 
+#define STUB_EVENT_WITH_CUSTOM_WEEKLY_RECURRENCE "BEGIN:VEVENT\n"                         \
+                                                  "SUMMARY:Custom weekly\n"              \
+                                                  "UID:custom-weekly@example.test\n"     \
+                                                  "DTSTART:20260909T090000Z\n"           \
+                                                  "DTEND:20260909T100000Z\n"             \
+                                                  "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=6\n" \
+                                                  "EXDATE:20260923T090000Z\n"            \
+                                                  "X-NOBUHIKO-KEEP:recurrence\n"         \
+                                                  "END:VEVENT\n"
+
+#define STUB_EVENT_WITH_MONTH_DAY_RECURRENCE "BEGIN:VEVENT\n"                    \
+                                              "SUMMARY:Month day\n"               \
+                                              "UID:month-day@example.test\n"      \
+                                              "DTSTART:20260909T090000Z\n"        \
+                                              "DTEND:20260909T100000Z\n"          \
+                                              "RRULE:FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=9;UNTIL=20270909T090000Z\n" \
+                                              "END:VEVENT\n"
+
+#define STUB_EVENT_WITH_NTH_WEEKDAY_RECURRENCE "BEGIN:VEVENT\n"                   \
+                                                "SUMMARY:Nth weekday\n"             \
+                                                "UID:nth-weekday@example.test\n"    \
+                                                "DTSTART:20260927T090000Z\n"         \
+                                                "DTEND:20260927T100000Z\n"           \
+                                                "RRULE:FREQ=MONTHLY;BYDAY=-1SU\n"   \
+                                                "END:VEVENT\n"
+
+#define STUB_EVENT_WITH_IMPORTED_RECURRENCE "BEGIN:VEVENT\n"                    \
+                                            "SUMMARY:Imported recurrence\n"       \
+                                            "UID:imported-recurrence@example.test\n" \
+                                            "DTSTART:20260909T090000Z\n"          \
+                                            "DTEND:20260909T100000Z\n"            \
+                                            "RRULE:FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=1\n" \
+                                            "RDATE:20261001T090000Z\n"            \
+                                            "END:VEVENT\n"
+
 /*
  * Auxiliary methods
  */
@@ -490,6 +525,105 @@ event_reminders_reindex_duplicate_offsets (void)
   g_assert_false (gcal_event_has_alarm_at_minutes (event, 45));
   alarms = gcal_event_get_alarms (event);
   g_assert_null (alarms);
+}
+
+/*********************************************************************************************************************/
+
+static void
+event_custom_recurrence_roundtrips (void)
+{
+  g_autoptr (GcalEvent) event = create_event_for_string (STUB_EVENT_WITH_CUSTOM_WEEKLY_RECURRENCE, NULL);
+  g_autoptr (GcalRecurrence) edited = NULL;
+  ICalRecurrence *rrule = NULL;
+  g_autofree gchar *rule = NULL;
+  g_autofree gchar *serialized = NULL;
+  GcalRecurrence *recur = gcal_event_get_recurrence (event);
+
+  g_assert_nonnull (recur);
+  g_assert_cmpint (recur->frequency, ==, GCAL_RECURRENCE_WEEKLY);
+  g_assert_cmpuint (recur->interval, ==, 2);
+  g_assert_cmpuint (recur->week_days, ==,
+                    GCAL_RECURRENCE_WEEKDAY_MASK (G_DATE_MONDAY) |
+                    GCAL_RECURRENCE_WEEKDAY_MASK (G_DATE_WEDNESDAY));
+  g_assert_cmpint (recur->limit_type, ==, GCAL_RECURRENCE_COUNT);
+  g_assert_cmpuint (recur->limit.count, ==, 6);
+
+  rrule = gcal_recurrence_to_rrule (recur);
+  rule = i_cal_recurrence_to_string (rrule);
+  g_assert_nonnull (strstr (rule, "FREQ=WEEKLY"));
+  g_assert_nonnull (strstr (rule, "INTERVAL=2"));
+  g_assert_nonnull (strstr (rule, "BYDAY=MO,WE"));
+  g_assert_nonnull (strstr (rule, "COUNT=6"));
+  g_clear_object (&rrule);
+
+  edited = gcal_recurrence_copy (recur);
+  edited->interval = 3;
+  g_assert_false (gcal_recurrence_is_equal (recur, edited));
+  gcal_event_set_recurrence (event, edited);
+
+  serialized = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (event)));
+  g_assert_nonnull (strstr (serialized, "INTERVAL=3"));
+  g_assert_nonnull (strstr (serialized, "BYDAY=MO,WE"));
+  g_assert_nonnull (strstr (serialized, "EXDATE:20260923T090000Z"));
+  g_assert_nonnull (strstr (serialized, "X-NOBUHIKO-KEEP:recurrence"));
+}
+
+/*********************************************************************************************************************/
+
+static void
+event_monthly_recurrence_patterns (void)
+{
+  g_autoptr (GcalEvent) month_day = create_event_for_string (STUB_EVENT_WITH_MONTH_DAY_RECURRENCE, NULL);
+  g_autoptr (GcalEvent) nth_weekday = create_event_for_string (STUB_EVENT_WITH_NTH_WEEKDAY_RECURRENCE, NULL);
+  ICalRecurrence *rrule = NULL;
+  g_autofree gchar *rule = NULL;
+  GcalRecurrence *recur;
+
+  recur = gcal_event_get_recurrence (month_day);
+  g_assert_cmpint (recur->frequency, ==, GCAL_RECURRENCE_MONTHLY);
+  g_assert_cmpuint (recur->interval, ==, 3);
+  g_assert_cmpint (recur->monthly_pattern, ==, GCAL_RECURRENCE_MONTHLY_DAY_OF_MONTH);
+  g_assert_cmpint (recur->month_day, ==, 9);
+  g_assert_cmpint (recur->limit_type, ==, GCAL_RECURRENCE_UNTIL);
+
+  recur = gcal_event_get_recurrence (nth_weekday);
+  g_assert_cmpint (recur->frequency, ==, GCAL_RECURRENCE_MONTHLY);
+  g_assert_cmpint (recur->monthly_pattern, ==, GCAL_RECURRENCE_MONTHLY_NTH_WEEKDAY);
+  g_assert_cmpint (recur->month_week, ==, -1);
+  g_assert_cmpint (recur->month_weekday, ==, G_DATE_SUNDAY);
+
+  rrule = gcal_recurrence_to_rrule (recur);
+  rule = i_cal_recurrence_to_string (rrule);
+  g_assert_nonnull (strstr (rule, "BYDAY=-1SU"));
+  g_clear_object (&rrule);
+}
+
+/*********************************************************************************************************************/
+
+static void
+event_imported_recurrence_is_not_rewritten (void)
+{
+  g_autoptr (GcalEvent) event = create_event_for_string (STUB_EVENT_WITH_IMPORTED_RECURRENCE, NULL);
+  g_autoptr (GcalEvent) clone = gcal_event_new_from_event (event);
+  g_autofree gchar *before = NULL;
+  g_autofree gchar *after = NULL;
+  GcalRecurrence *recur = gcal_event_get_recurrence (event);
+
+  g_assert_nonnull (recur);
+  g_assert_cmpint (recur->frequency, ==, GCAL_RECURRENCE_OTHER);
+  g_assert_null (gcal_recurrence_to_rrule (recur));
+  g_assert_true (gcal_event_schedule_equal (event, clone));
+
+  before = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (event)));
+  gcal_event_set_busy (event, FALSE);
+  after = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (event)));
+
+  g_assert_nonnull (strstr (after, "BYSETPOS=1"));
+  g_assert_nonnull (strstr (after, "RDATE:20261001T090000Z"));
+  g_assert_cmpuint (strlen (after), >=, strlen (before));
 }
 
 /*********************************************************************************************************************/
@@ -920,6 +1054,9 @@ main (gint   argc,
   g_test_add_func ("/event/visibility/preserves-metadata", event_visibility_preserves_metadata);
   g_test_add_func ("/event/reminders/preserve-imported-alarms", event_reminders_preserve_imported_alarms);
   g_test_add_func ("/event/reminders/reindex-duplicate-offsets", event_reminders_reindex_duplicate_offsets);
+  g_test_add_func ("/event/recurrence/custom-roundtrip", event_custom_recurrence_roundtrips);
+  g_test_add_func ("/event/recurrence/monthly-patterns", event_monthly_recurrence_patterns);
+  g_test_add_func ("/event/recurrence/imported-preserved", event_imported_recurrence_is_not_rewritten);
   g_test_add_func ("/event/nodtend", event_no_dtend);
   g_test_add_func ("/event/date/start", event_date_start);
   g_test_add_func ("/event/date/end", event_date_end);

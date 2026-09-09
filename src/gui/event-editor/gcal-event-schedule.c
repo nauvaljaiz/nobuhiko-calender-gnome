@@ -280,7 +280,9 @@ gcal_event_schedule_set_end_date_time (const GcalEventSchedule *values, GDateTim
 }
 
 static GcalRecurrence *
-recur_change_frequency (GcalRecurrence *old_recur, GcalRecurrenceFrequency frequency)
+recur_change_frequency (GcalRecurrence          *old_recur,
+                        GcalRecurrenceFrequency  frequency,
+                        GDateTime              *date_start)
 {
   if (frequency == GCAL_RECURRENCE_NO_REPEAT)
     {
@@ -301,6 +303,19 @@ recur_change_frequency (GcalRecurrence *old_recur, GcalRecurrenceFrequency frequ
         }
 
       new_recur->frequency = frequency;
+      new_recur->interval = 1;
+      new_recur->week_days = 0;
+      new_recur->monthly_pattern = GCAL_RECURRENCE_MONTHLY_DAY_OF_MONTH;
+      new_recur->month_day = 0;
+      new_recur->month_week = 0;
+      new_recur->month_weekday = G_DATE_BAD_WEEKDAY;
+
+      if (frequency == GCAL_RECURRENCE_MON_FRI)
+        new_recur->week_days = GCAL_RECURRENCE_WEEKDAYS_MON_FRI;
+      else if (frequency == GCAL_RECURRENCE_WEEKLY && date_start)
+        new_recur->week_days = GCAL_RECURRENCE_WEEKDAY_MASK (g_date_time_get_day_of_week (date_start));
+      else if (frequency == GCAL_RECURRENCE_MONTHLY && date_start)
+        new_recur->month_day = g_date_time_get_day_of_month (date_start);
 
       return new_recur;
     }
@@ -352,9 +367,75 @@ gcal_event_schedule_set_recur_frequency (const GcalEventSchedule *values,
                                          GcalRecurrenceFrequency frequency)
 {
   GcalEventSchedule *copy = gcal_event_schedule_copy (values);
-  GcalRecurrence *new_recur = recur_change_frequency (copy->curr.recur, frequency);
+  GcalRecurrence *new_recur = recur_change_frequency (copy->curr.recur, frequency, values->curr.date_start);
   g_clear_pointer (&copy->curr.recur, gcal_recurrence_unref);
   copy->curr.recur = new_recur;
+
+  return copy;
+}
+
+GcalEventSchedule *
+gcal_event_schedule_set_recurrence_interval (const GcalEventSchedule *values,
+                                             guint                    interval)
+{
+  GcalEventSchedule *copy = gcal_event_schedule_copy (values);
+
+  g_assert (copy->curr.recur != NULL);
+  g_assert (copy->curr.recur->frequency != GCAL_RECURRENCE_NO_REPEAT);
+  g_assert (copy->curr.recur->frequency != GCAL_RECURRENCE_OTHER);
+  g_assert (interval >= 1 && interval <= G_MAXSHORT);
+
+  if (copy->curr.recur->frequency == GCAL_RECURRENCE_MON_FRI)
+    copy->curr.recur->frequency = GCAL_RECURRENCE_WEEKLY;
+
+  copy->curr.recur->interval = interval;
+  return copy;
+}
+
+GcalEventSchedule *
+gcal_event_schedule_set_recurrence_week_days (const GcalEventSchedule *values,
+                                              guint                    week_days)
+{
+  const guint all_days = (1u << G_DATE_SUNDAY) - 1;
+  GcalEventSchedule *copy = gcal_event_schedule_copy (values);
+
+  g_assert (copy->curr.recur != NULL);
+  g_assert (copy->curr.recur->frequency == GCAL_RECURRENCE_WEEKLY ||
+            copy->curr.recur->frequency == GCAL_RECURRENCE_MON_FRI);
+  g_assert (week_days != 0 && (week_days & ~all_days) == 0);
+
+  copy->curr.recur->frequency = GCAL_RECURRENCE_WEEKLY;
+  copy->curr.recur->week_days = week_days;
+  return copy;
+}
+
+GcalEventSchedule *
+gcal_event_schedule_set_monthly_pattern (const GcalEventSchedule          *values,
+                                         GcalRecurrenceMonthlyPattern      pattern)
+{
+  GcalEventSchedule *copy = gcal_event_schedule_copy (values);
+  GDateTime *date_start = copy->curr.date_start;
+  gint day_of_month;
+
+  g_assert (copy->curr.recur != NULL);
+  g_assert (copy->curr.recur->frequency == GCAL_RECURRENCE_MONTHLY);
+  g_assert (date_start != NULL);
+
+  day_of_month = g_date_time_get_day_of_month (date_start);
+  copy->curr.recur->monthly_pattern = pattern;
+
+  if (pattern == GCAL_RECURRENCE_MONTHLY_DAY_OF_MONTH)
+    {
+      copy->curr.recur->month_day = day_of_month;
+      copy->curr.recur->month_week = 0;
+      copy->curr.recur->month_weekday = G_DATE_BAD_WEEKDAY;
+    }
+  else
+    {
+      copy->curr.recur->month_day = 0;
+      copy->curr.recur->month_week = (day_of_month - 1) / 7 + 1;
+      copy->curr.recur->month_weekday = g_date_time_get_day_of_week (date_start);
+    }
 
   return copy;
 }
@@ -632,7 +713,7 @@ test_recur_changes_to_no_repeat (void)
   g_autoptr (GcalRecurrence) old_recur = gcal_recurrence_new ();
   old_recur->frequency = GCAL_RECURRENCE_WEEKLY;
 
-  g_autoptr (GcalRecurrence) new_recur = recur_change_frequency (old_recur, GCAL_RECURRENCE_NO_REPEAT);
+  g_autoptr (GcalRecurrence) new_recur = recur_change_frequency (old_recur, GCAL_RECURRENCE_NO_REPEAT, NULL);
   g_assert_null (new_recur);
 }
 
@@ -660,6 +741,47 @@ test_recur_changes_limit_type_to_until (void)
   g_assert (g_date_time_equal (new_recur->limit.until, date));
 }
 
+static void
+test_custom_recurrence_values (void)
+{
+  g_autofree gchar *rule = NULL;
+  ICalRecurrence *rrule;
+  g_autoptr (GcalEventSchedule) values =
+    gcal_event_schedule_with_date_times ("20250411T10:00:00-06:00",
+                                         "20250411T11:30:00-06:00",
+                                         FALSE);
+  g_autoptr (GcalEventSchedule) weekly =
+    gcal_event_schedule_set_recur_frequency (values, GCAL_RECURRENCE_WEEKLY);
+  g_autoptr (GcalEventSchedule) interval =
+    gcal_event_schedule_set_recurrence_interval (weekly, 2);
+  g_autoptr (GcalEventSchedule) weekdays =
+    gcal_event_schedule_set_recurrence_week_days (
+      interval,
+      GCAL_RECURRENCE_WEEKDAY_MASK (G_DATE_MONDAY) |
+      GCAL_RECURRENCE_WEEKDAY_MASK (G_DATE_WEDNESDAY));
+  g_autoptr (GcalEventSchedule) monthly =
+    gcal_event_schedule_set_recur_frequency (weekdays, GCAL_RECURRENCE_MONTHLY);
+  g_autoptr (GcalEventSchedule) nth_weekday =
+    gcal_event_schedule_set_monthly_pattern (monthly, GCAL_RECURRENCE_MONTHLY_NTH_WEEKDAY);
+
+  g_assert_cmpuint (weekly->curr.recur->week_days, ==,
+                    GCAL_RECURRENCE_WEEKDAY_MASK (G_DATE_FRIDAY));
+  g_assert_cmpuint (interval->curr.recur->interval, ==, 2);
+  g_assert_cmpuint (weekdays->curr.recur->week_days, ==,
+                    GCAL_RECURRENCE_WEEKDAY_MASK (G_DATE_MONDAY) |
+                    GCAL_RECURRENCE_WEEKDAY_MASK (G_DATE_WEDNESDAY));
+  g_assert_cmpint (monthly->curr.recur->monthly_pattern, ==, GCAL_RECURRENCE_MONTHLY_DAY_OF_MONTH);
+  g_assert_cmpint (monthly->curr.recur->month_day, ==, 11);
+  g_assert_cmpint (nth_weekday->curr.recur->monthly_pattern, ==, GCAL_RECURRENCE_MONTHLY_NTH_WEEKDAY);
+  g_assert_cmpint (nth_weekday->curr.recur->month_week, ==, 2);
+  g_assert_cmpint (nth_weekday->curr.recur->month_weekday, ==, G_DATE_FRIDAY);
+
+  rrule = gcal_recurrence_to_rrule (nth_weekday->curr.recur);
+  rule = i_cal_recurrence_to_string (rrule);
+  g_assert_nonnull (strstr (rule, "BYDAY=2FR"));
+  g_clear_object (&rrule);
+}
+
 void
 gcal_event_schedule_add_tests (void)
 {
@@ -679,4 +801,6 @@ gcal_event_schedule_add_tests (void)
                    test_recur_changes_limit_type_to_count);
   g_test_add_func ("/event_editor/event_schedule/recur_changes_limit_type_to_until",
                    test_recur_changes_limit_type_to_until);
+  g_test_add_func ("/event_editor/event_schedule/custom_recurrence_values",
+                   test_custom_recurrence_values);
 }

@@ -76,6 +76,12 @@ GcalEventSchedule  *gcal_event_schedule_set_recur_frequency     (const GcalEvent
                                                                  GcalRecurrenceFrequency  frequency);
 GcalEventSchedule  *gcal_event_schedule_set_recur_limit_type    (const GcalEventSchedule *values,
                                                                  GcalRecurrenceLimitType  limit_type);
+GcalEventSchedule  *gcal_event_schedule_set_recurrence_interval (const GcalEventSchedule *values,
+                                                                 guint                    interval);
+GcalEventSchedule  *gcal_event_schedule_set_recurrence_week_days(const GcalEventSchedule *values,
+                                                                 guint                    week_days);
+GcalEventSchedule  *gcal_event_schedule_set_monthly_pattern     (const GcalEventSchedule *values,
+                                                                 GcalRecurrenceMonthlyPattern pattern);
 GcalEventSchedule  *gcal_event_schedule_set_recurrence_count    (const GcalEventSchedule *values,
                                                                  guint                    count);
 GcalEventSchedule  *gcal_event_schedule_set_recurrence_until    (const GcalEventSchedule *values,

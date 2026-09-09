@@ -1841,6 +1841,148 @@ msgstr "Jenis pengingat ini akan dipertahankan kecuali dihapus"
 msgid "Imported reminder type"
 msgstr "Jenis pengingat yang diimpor"
 
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Imported recurrence"
+msgstr "Pengulangan yang diimpor"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Repeat Every"
+msgstr "Ulangi Setiap"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Repeat On"
+msgstr "Ulangi Pada"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Mon"
+msgstr "Sen"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Tue"
+msgstr "Sel"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Wed"
+msgstr "Rab"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Thu"
+msgstr "Kam"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Fri"
+msgstr "Jum"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Sat"
+msgstr "Sab"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Sun"
+msgstr "Min"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Monday"
+msgstr "Senin"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Tuesday"
+msgstr "Selasa"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Wednesday"
+msgstr "Rabu"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Thursday"
+msgstr "Kamis"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Friday"
+msgstr "Jumat"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Saturday"
+msgstr "Sabtu"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Sunday"
+msgstr "Minggu"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Monthly Pattern"
+msgstr "Pola Bulanan"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Day of the month"
+msgstr "Tanggal dalam bulan"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "Weekday position"
+msgstr "Posisi hari dalam bulan"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+msgid "First"
+msgstr "Pertama"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+msgid "Second"
+msgstr "Kedua"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+msgid "Third"
+msgstr "Ketiga"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+msgid "Fourth"
+msgstr "Keempat"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+msgid "Fifth"
+msgstr "Kelima"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+msgid "Last"
+msgstr "Terakhir"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+msgid "Last day of the month"
+msgstr "Hari terakhir dalam bulan"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+#, c-format
+msgid "Day %d"
+msgstr "Tanggal %d"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+#, c-format
+msgid "%1$s %2$s"
+msgstr "%1$s %2$s"
+
+#: src/gui/event-editor/gcal-schedule-section.blp
+msgid "This rule is more complex than the editor supports and will be preserved unless replaced"
+msgstr "Aturan ini lebih kompleks daripada yang didukung editor dan akan dipertahankan kecuali diganti"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+msgid "day"
+msgid_plural "days"
+msgstr[0] "hari"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+msgid "week"
+msgid_plural "weeks"
+msgstr[0] "minggu"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+msgid "month"
+msgid_plural "months"
+msgstr[0] "bulan"
+
+#: src/gui/event-editor/gcal-schedule-section.c
+msgid "year"
+msgid_plural "years"
+msgstr[0] "tahun"
+
 #~ msgid "Notes"
 #~ msgstr "Catatan"
 

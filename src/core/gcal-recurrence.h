@@ -48,6 +48,19 @@ typedef enum
 
 typedef enum
 {
+  GCAL_RECURRENCE_MONTHLY_DAY_OF_MONTH,
+  GCAL_RECURRENCE_MONTHLY_NTH_WEEKDAY,
+} GcalRecurrenceMonthlyPattern;
+
+#define GCAL_RECURRENCE_WEEKDAY_MASK(day) (1u << ((day) - 1))
+#define GCAL_RECURRENCE_WEEKDAYS_MON_FRI  (GCAL_RECURRENCE_WEEKDAY_MASK (G_DATE_MONDAY)    | \
+                                           GCAL_RECURRENCE_WEEKDAY_MASK (G_DATE_TUESDAY)   | \
+                                           GCAL_RECURRENCE_WEEKDAY_MASK (G_DATE_WEDNESDAY) | \
+                                           GCAL_RECURRENCE_WEEKDAY_MASK (G_DATE_THURSDAY)  | \
+                                           GCAL_RECURRENCE_WEEKDAY_MASK (G_DATE_FRIDAY))
+
+typedef enum
+{
   GCAL_RECURRENCE_MOD_NONE            = 0,
   GCAL_RECURRENCE_MOD_THIS_ONLY       = E_CAL_OBJ_MOD_THIS,
   GCAL_RECURRENCE_MOD_THIS_AND_FUTURE = E_CAL_OBJ_MOD_THIS_AND_FUTURE,
@@ -60,6 +73,14 @@ struct _GcalRecurrence
 
   GcalRecurrenceFrequency  frequency;
   GcalRecurrenceLimitType  limit_type;
+
+  guint                    interval;
+  guint                    week_days;
+
+  GcalRecurrenceMonthlyPattern monthly_pattern;
+  gint                     month_day;
+  gint                     month_week;
+  GDateWeekday             month_weekday;
 
   struct
   {

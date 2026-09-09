@@ -49,3 +49,23 @@ a release gate before Google adapter features ship.
 - A fresh eight-second graphical smoke test confirms both the availability and
   reminders editor templates load from the application resources without a GTK
   critical error.
+
+## 2026-09-09 — custom recurrence
+
+- Added editable recurrence intervals for daily, weekly, monthly and yearly
+  rules, multi-day weekly selection, day-of-month and ordinal-weekday monthly
+  patterns, and the existing forever/count/until end conditions.
+- The supported model maps to the `FREQ`, `INTERVAL`, `BYDAY`, `BYMONTHDAY`,
+  `COUNT`, and `UNTIL` parts documented by the
+  [Google Calendar recurrence model](https://developers.google.com/workspace/calendar/api/concepts/events-calendars#recurring_events).
+- `EXDATE` exceptions and unrelated custom properties survive supported rule
+  edits. Multiple rules, inclusion dates, exclusion rules, `BYSETPOS`, and
+  other unsupported shapes are presented as imported and are not rewritten by
+  unrelated event edits.
+- Targeted event and internal editor tests cover weekly and monthly round-trips,
+  imported-rule detection, exception preservation, interval/day mutations, and
+  the imported recurrence widget state.
+- The full Meson suite remains green at 11/11 tests; strict schema, desktop file,
+  AppStream and Indonesian catalog validation also pass.
+- An isolated eight-second graphical smoke test loaded the expanded schedule
+  editor without an application or GTK critical error.

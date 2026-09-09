@@ -37,6 +37,13 @@ stored separately from user-visible event data. OAuth refresh tokens belong in
 the desktop secret service. Logs must exclude tokens, attendee addresses and
 private descriptions by default.
 
+Recurrence editing follows the same boundary. The provider-neutral model can
+write one regular `RRULE` with an interval, weekly `BYDAY`, one monthly
+`BYMONTHDAY` or ordinal `BYDAY`, and a `COUNT` or `UNTIL` limit. `EXDATE`
+exceptions survive edits to those supported rules. Multiple `RRULE` values,
+`RDATE`, `EXRULE`, `BYSETPOS`, and other shapes stay in the EDS component and
+appear as imported recurrence until the user explicitly chooses a replacement.
+
 Google incremental synchronization persists `nextSyncToken`, follows pagination,
 includes deletions, and performs a new full sync after an HTTP 410 response, as
 specified by the [official synchronization guide](https://developers.google.com/workspace/calendar/api/guides/sync).

@@ -8,7 +8,9 @@ The current development build uses the application ID
 `local.nobuhiko.Calendar.Devel`, so it can be installed beside GNOME Calendar.
 The first fork features add event controls for **Busy/Free** availability and
 **Default/Public/Private** visibility, plus **custom reminder offsets** that
-preserve imported alarm types.
+preserve imported alarm types. Recurring events support custom intervals,
+weekday selection, monthly patterns, occurrence counts and end dates while
+retaining recurrence rules that the editor cannot represent.
 
 ## Project plan
 

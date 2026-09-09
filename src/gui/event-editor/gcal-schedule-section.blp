@@ -76,10 +76,106 @@ template $GcalScheduleSection: $GcalEventEditorSection {
           _("Weekly"),
           _("Monthly"),
           _("Yearly"),
+          _("Imported recurrence"),
         ]
       };
 
       notify::selected-item => $on_repeat_type_changed_cb();
+    }
+
+    Adw.ActionRow repeat_interval_row {
+      visible: false;
+      title: _("Repeat Every");
+      activatable-widget: repeat_interval_spin;
+
+      Box {
+        spacing: 6;
+        valign: center;
+
+        SpinButton repeat_interval_spin {
+          numeric: true;
+          width-chars: 5;
+          adjustment: repeat_interval_adjustment;
+          value-changed => $on_repeat_interval_changed_cb() swapped;
+        }
+
+        Label repeat_interval_unit_label {
+          xalign: 0;
+        }
+      }
+    }
+
+    Adw.ActionRow weekday_row {
+      visible: false;
+      title: _("Repeat On");
+
+      Box {
+        spacing: 3;
+        valign: center;
+
+        ToggleButton monday_button {
+          label: _("Mon");
+          tooltip-text: _("Monday");
+          toggled => $on_weekday_toggled_cb(template) not-swapped;
+        }
+
+        ToggleButton tuesday_button {
+          label: _("Tue");
+          tooltip-text: _("Tuesday");
+          toggled => $on_weekday_toggled_cb(template) not-swapped;
+        }
+
+        ToggleButton wednesday_button {
+          label: _("Wed");
+          tooltip-text: _("Wednesday");
+          toggled => $on_weekday_toggled_cb(template) not-swapped;
+        }
+
+        ToggleButton thursday_button {
+          label: _("Thu");
+          tooltip-text: _("Thursday");
+          toggled => $on_weekday_toggled_cb(template) not-swapped;
+        }
+
+        ToggleButton friday_button {
+          label: _("Fri");
+          tooltip-text: _("Friday");
+          toggled => $on_weekday_toggled_cb(template) not-swapped;
+        }
+
+        ToggleButton saturday_button {
+          label: _("Sat");
+          tooltip-text: _("Saturday");
+          toggled => $on_weekday_toggled_cb(template) not-swapped;
+        }
+
+        ToggleButton sunday_button {
+          label: _("Sun");
+          tooltip-text: _("Sunday");
+          toggled => $on_weekday_toggled_cb(template) not-swapped;
+        }
+      }
+    }
+
+    Adw.ComboRow monthly_pattern_combo {
+      visible: false;
+      title: _("Monthly Pattern");
+
+      model: StringList {
+        strings [
+          _("Day of the month"),
+          _("Weekday position"),
+        ]
+      };
+
+      notify::selected-item => $on_monthly_pattern_changed_cb();
+    }
+
+    Adw.ActionRow imported_recurrence_row {
+      visible: false;
+      title: _("Imported recurrence");
+      subtitle: _("This rule is more complex than the editor supports and will be preserved unless replaced");
+      icon-name: "dialog-information-symbolic";
     }
 
     Adw.ComboRow repeat_duration_combo {
@@ -132,4 +228,12 @@ Adjustment number_of_occurrences_adjustment {
   page-increment: 1;
   page-size: 10;
   value: 2;
+}
+
+Adjustment repeat_interval_adjustment {
+  lower: 1;
+  upper: 32767;
+  step-increment: 1;
+  page-increment: 10;
+  value: 1;
 }

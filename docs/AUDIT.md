@@ -11,7 +11,7 @@ not an undocumented private service.
 | Native UI | GTK 4, libadwaita, adaptive layouts, keyboard navigation and accessibility | Strong native foundation |
 | Data and accounts | Evolution Data Server (EDS), local calendars, CalDAV, WebDAV discovery and GNOME Online Accounts | Google calendars work through the system account stack, but Google-specific fields are incomplete |
 | Views | Month, week and agenda | Day, year and schedule-style density controls are missing |
-| Event editing | Title, location, notes, calendar, date/time, all-day, timezone and basic recurrence | Core editing works; advanced recurrence and several Google fields are missing |
+| Event editing | Title, location, notes, calendar, date/time, all-day and timezone; **this fork adds editable recurrence intervals, weekly day selection, monthly patterns, counts and end dates** | Multiple-rule and advanced RFC recurrence sets are preserved as imported; several Google fields remain missing |
 | Reminders | Multiple display alarms from presets plus **custom 1–40,320 minute offsets in this fork**; imported alarm types remain separate and removable | Email delivery and calendar-level defaults still need provider support |
 | Invitations | Organizer and attendee data are represented; attendee status can be displayed | Adding/removing guests, permissions, RSVP actions, rooms and proposed times are incomplete |
 | Meetings | Common meeting URLs can be detected and opened | Creating Google Meet conference data is missing |
@@ -29,7 +29,7 @@ contains read-only or server-managed values that a client must preserve. See the
 
 | Capability group | Missing or incomplete work | Delivery approach |
 |---|---|---|
-| Event details | Per-event color, custom recurrence, custom reminders, attachments and complete metadata preservation | Add provider-neutral event model APIs first, then editor sections gated by source capabilities |
+| Event details | Per-event color, attachments and complete metadata preservation | Add provider-neutral event model APIs first, then editor sections gated by source capabilities |
 | Collaboration | Guest editor, RSVP, optional/required guests, guest permissions, rooms/resources, availability grid and suggested times | Use iCalendar scheduling and EDS where supported; add Google API operations only for fields EDS cannot round-trip |
 | Conferencing | Create/remove Google Meet; preserve all conference metadata | Google adapter using `conferenceDataVersion=1`; generic join-link UI remains provider-neutral |
 | Calendars | ACL sharing, subscriptions, color/default reminders, working hours and resource browsing | Extend calendar management with capability checks and Google-specific pages where necessary |

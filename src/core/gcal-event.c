@@ -2081,14 +2081,22 @@ gcal_event_set_recurrence (GcalEvent      *self,
   ICalRecurrence *rrule;
 
   g_return_if_fail (GCAL_IS_EVENT (self));
-
-  rrule = gcal_recurrence_to_rrule (recur);
+  g_return_if_fail (!recur || recur->frequency != GCAL_RECURRENCE_OTHER);
 
   comp = gcal_event_get_component (self);
   icalcomp = e_cal_component_get_icalcomponent (comp);
 
   g_clear_pointer (&self->recurrence, gcal_recurrence_unref);
+
+  if (!recur || recur->frequency == GCAL_RECURRENCE_NO_REPEAT)
+    {
+      e_cal_component_set_rrules (comp, NULL);
+      e_cal_component_commit_sequence (self->component);
+      return;
+    }
+
   self->recurrence = gcal_recurrence_copy (recur);
+  rrule = gcal_recurrence_to_rrule (recur);
 
   prop = i_cal_component_get_first_property (icalcomp, I_CAL_RRULE_PROPERTY);
 
