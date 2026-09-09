@@ -2,6 +2,7 @@
 <gresources>
   <gresource prefix="/org/gnome/calendar/ui/event-editor">
     <file compressed="true">gcal-alarm-row.ui</file>
+    <file compressed="true">gcal-availability-section.ui</file>
     <file compressed="true">gcal-date-chooser-row.ui</file>
     <file compressed="true">gcal-date-time-chooser.ui</file>
     <file compressed="true">gcal-date-selector.ui</file>

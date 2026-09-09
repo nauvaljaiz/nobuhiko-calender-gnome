@@ -99,6 +99,50 @@
                                  "X-NOBUHIKO-KEEP:preserved\n"                \
                                  "END:VEVENT\n"
 
+#define STUB_EVENT_WITH_MIXED_ALARMS "BEGIN:VEVENT\n"                          \
+                                     "SUMMARY:Alarm preservation\n"             \
+                                     "UID:alarms@example.test\n"                 \
+                                     "DTSTART:20260909T090000Z\n"                \
+                                     "DTEND:20260909T100000Z\n"                  \
+                                     "BEGIN:VALARM\n"                            \
+                                     "ACTION:DISPLAY\n"                          \
+                                     "DESCRIPTION:Supported\n"                   \
+                                     "TRIGGER:-PT45M\n"                          \
+                                     "END:VALARM\n"                              \
+                                     "BEGIN:VALARM\n"                            \
+                                     "ACTION:DISPLAY\n"                          \
+                                     "DESCRIPTION:Absolute\n"                    \
+                                     "TRIGGER;VALUE=DATE-TIME:20260909T083000Z\n" \
+                                     "END:VALARM\n"                              \
+                                     "BEGIN:VALARM\n"                            \
+                                     "ACTION:DISPLAY\n"                          \
+                                     "DESCRIPTION:Relative to end\n"             \
+                                     "TRIGGER;RELATED=END:-PT10M\n"              \
+                                     "END:VALARM\n"                              \
+                                     "BEGIN:VALARM\n"                            \
+                                     "ACTION:DISPLAY\n"                          \
+                                     "DESCRIPTION:After start\n"                 \
+                                     "TRIGGER:PT5M\n"                            \
+                                     "END:VALARM\n"                              \
+                                     "END:VEVENT\n"
+
+#define STUB_EVENT_WITH_DUPLICATE_ALARMS "BEGIN:VEVENT\n"              \
+                                         "SUMMARY:Duplicate alarms\n"    \
+                                         "UID:duplicate@example.test\n"  \
+                                         "DTSTART:20260909T090000Z\n"   \
+                                         "DTEND:20260909T100000Z\n"     \
+                                         "BEGIN:VALARM\n"               \
+                                         "ACTION:DISPLAY\n"             \
+                                         "DESCRIPTION:First\n"          \
+                                         "TRIGGER:-PT45M\n"             \
+                                         "END:VALARM\n"                 \
+                                         "BEGIN:VALARM\n"               \
+                                         "ACTION:DISPLAY\n"             \
+                                         "DESCRIPTION:Second\n"         \
+                                         "TRIGGER:-PT45M\n"             \
+                                         "END:VALARM\n"                 \
+                                         "END:VEVENT\n"
+
 /*
  * Auxiliary methods
  */
@@ -340,6 +384,112 @@ event_visibility_preserves_metadata (void)
   g_assert_nonnull (strstr (serialized, "ATTENDEE:mailto:guest@example.test"));
   g_assert_nonnull (strstr (serialized, "ATTACH:https://example.test/file"));
   g_assert_nonnull (strstr (serialized, "X-NOBUHIKO-KEEP:preserved"));
+}
+
+/*********************************************************************************************************************/
+
+static void
+event_reminders_preserve_imported_alarms (void)
+{
+  g_autoptr (GcalEvent) event = create_event_for_string (STUB_EVENT_WITH_MIXED_ALARMS, NULL);
+  g_autoptr (GcalEvent) clone = gcal_event_new_from_event (event);
+  g_autofree gchar *serialized = NULL;
+  GList *alarms;
+  guint supported = 0;
+  guint unsupported = 0;
+
+  alarms = gcal_event_get_alarms (event);
+  g_assert_cmpuint (g_list_length (alarms), ==, 4);
+
+  for (GList *l = alarms; l; l = l->next)
+    {
+      if (get_alarm_trigger_minutes (event, l->data) >= 0)
+        supported++;
+      else
+        unsupported++;
+    }
+
+  g_assert_cmpuint (supported, ==, 1);
+  g_assert_cmpuint (unsupported, ==, 3);
+  g_assert_true (gcal_event_has_alarm_at_minutes (event, 45));
+  g_assert_true (gcal_event_alarms_equal (event, clone));
+  g_list_free_full (alarms, e_cal_component_alarm_free);
+
+  /* A replacement can change alarm contents without changing the count. */
+  gcal_event_add_alarm_minutes (clone, 45);
+  g_assert_false (gcal_event_alarms_equal (event, clone));
+
+  gcal_event_add_alarm_minutes (event, 90);
+  g_assert_true (gcal_event_has_alarm_at_minutes (event, 90));
+  g_assert_false (gcal_event_alarms_equal (event, clone));
+
+  alarms = gcal_event_get_alarms (event);
+  g_assert_cmpuint (g_list_length (alarms), ==, 5);
+  g_list_free_full (alarms, e_cal_component_alarm_free);
+
+  gcal_event_remove_alarm (event, 90);
+  g_assert_false (gcal_event_has_alarm_at_minutes (event, 90));
+  gcal_event_add_alarm_minutes (event, 90);
+
+  serialized = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (event)));
+  g_assert_nonnull (strstr (serialized, "DESCRIPTION:Absolute"));
+  g_assert_nonnull (strstr (serialized, "DESCRIPTION:Relative to end"));
+  g_assert_nonnull (strstr (serialized, "DESCRIPTION:After start"));
+
+  /* Adding the same supported offset replaces only that alarm. */
+  gcal_event_add_alarm_minutes (event, 45);
+  alarms = gcal_event_get_alarms (event);
+  g_assert_cmpuint (g_list_length (alarms), ==, 5);
+
+  for (GList *l = alarms; l; l = l->next)
+    {
+      if (get_alarm_trigger_minutes (event, l->data) < 0)
+        {
+          g_autofree gchar *uid = g_strdup (e_cal_component_alarm_get_uid (l->data));
+
+          g_assert_nonnull (uid);
+          gcal_event_remove_alarm_by_uid (event, uid);
+          break;
+        }
+    }
+
+  g_list_free_full (alarms, e_cal_component_alarm_free);
+
+  alarms = gcal_event_get_alarms (event);
+  g_assert_cmpuint (g_list_length (alarms), ==, 4);
+  g_list_free_full (alarms, e_cal_component_alarm_free);
+
+  gcal_event_remove_all_alarms (event);
+  alarms = gcal_event_get_alarms (event);
+  g_assert_null (alarms);
+  g_assert_false (gcal_event_has_alarm_at_minutes (event, 45));
+  g_assert_false (gcal_event_has_alarm_at_minutes (event, 90));
+}
+
+/*********************************************************************************************************************/
+
+static void
+event_reminders_reindex_duplicate_offsets (void)
+{
+  g_autoptr (GcalEvent) event = create_event_for_string (STUB_EVENT_WITH_DUPLICATE_ALARMS, NULL);
+  GList *alarms;
+
+  alarms = gcal_event_get_alarms (event);
+  g_assert_cmpuint (g_list_length (alarms), ==, 2);
+  g_list_free_full (alarms, e_cal_component_alarm_free);
+  g_assert_true (gcal_event_has_alarm_at_minutes (event, 45));
+
+  gcal_event_remove_alarm (event, 45);
+  alarms = gcal_event_get_alarms (event);
+  g_assert_cmpuint (g_list_length (alarms), ==, 1);
+  g_list_free_full (alarms, e_cal_component_alarm_free);
+  g_assert_true (gcal_event_has_alarm_at_minutes (event, 45));
+
+  gcal_event_remove_alarm (event, 45);
+  g_assert_false (gcal_event_has_alarm_at_minutes (event, 45));
+  alarms = gcal_event_get_alarms (event);
+  g_assert_null (alarms);
 }
 
 /*********************************************************************************************************************/
@@ -768,6 +918,8 @@ main (gint   argc,
   g_test_add_func ("/event/visibility", event_visibility);
   g_test_add_func ("/event/visibility/preserves-special-values", event_visibility_preserves_special_values);
   g_test_add_func ("/event/visibility/preserves-metadata", event_visibility_preserves_metadata);
+  g_test_add_func ("/event/reminders/preserve-imported-alarms", event_reminders_preserve_imported_alarms);
+  g_test_add_func ("/event/reminders/reindex-duplicate-offsets", event_reminders_reindex_duplicate_offsets);
   g_test_add_func ("/event/nodtend", event_no_dtend);
   g_test_add_func ("/event/date/start", event_date_start);
   g_test_add_func ("/event/date/end", event_date_end);

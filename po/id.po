@@ -1817,6 +1817,30 @@ msgstr "Publik"
 msgid "Private"
 msgstr "Pribadi"
 
+#: src/gui/event-editor/gcal-reminders-section.blp
+msgid "Custom reminder"
+msgstr "Pengingat khusus"
+
+#: src/gui/event-editor/gcal-reminders-section.blp
+msgid "minutes before"
+msgstr "menit sebelumnya"
+
+#: src/gui/event-editor/gcal-reminders-section.blp
+msgid "Add"
+msgstr "Tambah"
+
+#: src/gui/event-editor/gcal-alarm-row.c
+msgid "Imported reminder"
+msgstr "Pengingat yang diimpor"
+
+#: src/gui/event-editor/gcal-alarm-row.c
+msgid "This reminder type will be preserved unless removed"
+msgstr "Jenis pengingat ini akan dipertahankan kecuali dihapus"
+
+#: src/gui/event-editor/gcal-alarm-row.c
+msgid "Imported reminder type"
+msgstr "Jenis pengingat yang diimpor"
+
 #~ msgid "Notes"
 #~ msgstr "Catatan"
 

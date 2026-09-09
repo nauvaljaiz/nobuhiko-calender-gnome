@@ -755,32 +755,27 @@ get_alarm_trigger_minutes (GcalEvent          *event,
 {
   ECalComponentAlarmTrigger *trigger;
   ICalDuration *duration;
-  GDateTime *alarm_dt;
-  gint diff;
+  gint duration_seconds;
+
+  g_return_val_if_fail (GCAL_IS_EVENT (event), -1);
+  g_return_val_if_fail (alarm != NULL, -1);
 
   trigger = e_cal_component_alarm_get_trigger (alarm);
 
-  /*
-   * We only support alarms relative to the start date, and solely
-   * ignore whetever different it may be.
-   */
   if (!trigger || e_cal_component_alarm_trigger_get_kind (trigger) != E_CAL_COMPONENT_ALARM_TRIGGER_RELATIVE_START)
     return -1;
 
   duration = e_cal_component_alarm_trigger_get_duration (trigger);
-  alarm_dt = g_date_time_add_full (gcal_event_get_date_start (event),
-                                   0,
-                                   0,
-                                   - (i_cal_duration_get_days (duration) + i_cal_duration_get_weeks (duration) * N_WEEKDAYS),
-                                   - i_cal_duration_get_hours (duration),
-                                   - i_cal_duration_get_minutes (duration),
-                                   - i_cal_duration_get_seconds (duration));
+  if (!duration)
+    return -1;
 
-  diff = g_date_time_difference (gcal_event_get_date_start (event), alarm_dt) / G_TIME_SPAN_MINUTE;
+  duration_seconds = i_cal_duration_as_int (duration);
 
-  g_clear_pointer (&alarm_dt, g_date_time_unref);
+  /* The editor supports whole-minute alarms at or before the event start. */
+  if (duration_seconds > 0 || duration_seconds % 60 != 0)
+    return -1;
 
-  return diff;
+  return -duration_seconds / 60;
 }
 
 /**

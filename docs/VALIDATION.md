@@ -28,3 +28,24 @@ Results:
 Interactive editor automation and live Google account synchronization are not
 covered by this slice. The latter requires an opt-in test Google account and is
 a release gate before Google adapter features ship.
+
+## 2026-09-09 — custom reminders
+
+- Added precise reminder offsets from 1 to 40,320 minutes before an event, the
+  range accepted by [Google Calendar event reminder overrides](https://developers.google.com/workspace/calendar/api/v3/reference/events/update).
+- Corrected alarm trigger classification so absolute alarms, alarms relative to
+  event end, after-start alarms and sub-minute alarms are not mistaken for a
+  normal before-start offset.
+- Imported alarms are listed separately, retained during unrelated edits and
+  removable by their exact alarm UID.
+- Alarm equality now compares complete serialized alarm components, including
+  trigger type, action and additional properties.
+- Targeted event tests cover four mixed alarm types, full-content equality even
+  when alarm counts match, adding and replacing custom reminders, exact removal
+  and complete removal. Duplicate imported offsets are re-indexed after removing
+  one alarm, so the remaining reminder stays editable.
+- The full Meson suite remains green at 11/11 tests; strict schema, desktop file,
+  AppStream and Indonesian catalog validation also pass.
+- A fresh eight-second graphical smoke test confirms both the availability and
+  reminders editor templates load from the application resources without a GTK
+  critical error.

@@ -206,13 +206,31 @@ setup_alarm (GcalAlarmRow *self)
 {
   g_autofree gchar *formatted_duration = NULL;
   ECalComponentAlarmTrigger *trigger;
-  ICalDuration *duration;
+  ICalDuration *duration = NULL;
+  gboolean supported_trigger = FALSE;
 
   trigger = e_cal_component_alarm_get_trigger (self->alarm);
-  duration = e_cal_component_alarm_trigger_get_duration (trigger);
-  formatted_duration = format_alarm_duration (duration);
+  if (trigger &&
+      e_cal_component_alarm_trigger_get_kind (trigger) == E_CAL_COMPONENT_ALARM_TRIGGER_RELATIVE_START)
+    {
+      gint duration_seconds;
+
+      duration = e_cal_component_alarm_trigger_get_duration (trigger);
+      duration_seconds = duration ? i_cal_duration_as_int (duration) : 1;
+      supported_trigger = duration && duration_seconds <= 0 && duration_seconds % 60 == 0;
+    }
+
+  if (supported_trigger)
+    formatted_duration = format_alarm_duration (duration);
+  else
+    formatted_duration = g_strdup (_("Imported reminder"));
 
   adw_preferences_row_set_title (ADW_PREFERENCES_ROW (self), formatted_duration);
+
+  if (!supported_trigger)
+    adw_action_row_set_subtitle (ADW_ACTION_ROW (self), _("This reminder type will be preserved unless removed"));
+  else if (e_cal_component_alarm_get_action (self->alarm) != E_CAL_COMPONENT_ALARM_DISPLAY)
+    adw_action_row_set_subtitle (ADW_ACTION_ROW (self), _("Imported reminder type"));
 }
 
 

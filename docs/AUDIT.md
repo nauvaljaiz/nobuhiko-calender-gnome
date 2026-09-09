@@ -12,7 +12,7 @@ not an undocumented private service.
 | Data and accounts | Evolution Data Server (EDS), local calendars, CalDAV, WebDAV discovery and GNOME Online Accounts | Google calendars work through the system account stack, but Google-specific fields are incomplete |
 | Views | Month, week and agenda | Day, year and schedule-style density controls are missing |
 | Event editing | Title, location, notes, calendar, date/time, all-day, timezone and basic recurrence | Core editing works; advanced recurrence and several Google fields are missing |
-| Reminders | Multiple display alarms from preset offsets | Custom offsets, email reminders and calendar-level defaults need more work |
+| Reminders | Multiple display alarms from presets plus **custom 1–40,320 minute offsets in this fork**; imported alarm types remain separate and removable | Email delivery and calendar-level defaults still need provider support |
 | Invitations | Organizer and attendee data are represented; attendee status can be displayed | Adding/removing guests, permissions, RSVP actions, rooms and proposed times are incomplete |
 | Meetings | Common meeting URLs can be detected and opened | Creating Google Meet conference data is missing |
 | Files | ICS import is present | Export workflow and Google Drive attachments UI are incomplete |

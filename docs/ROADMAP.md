@@ -19,7 +19,8 @@ existing test suite passes and unrelated event metadata survives round-trips.
 - [x] Busy/Free availability with iCalendar preservation tests.
 - [x] Default/Public/Private visibility with confidential and unknown-value preservation.
 - [ ] Custom recurrence rules, exceptions and end conditions.
-- [ ] Custom reminder offsets and calendar defaults.
+- [x] Custom reminder offsets with safe preservation of imported alarm types.
+- [ ] Calendar-level default reminders and Google email reminder delivery.
 - [ ] Per-event color and generic attachments.
 - [ ] Export one event, a date range, or a calendar to ICS.
 
@@ -72,6 +73,6 @@ existing test suite passes and unrelated event metadata survives round-trips.
 
 ## Current next slice
 
-Implement custom reminder offsets without reducing support for imported alarm
-types. The editor should allow a precise duration while preserving alarms it
-cannot create itself.
+Add custom recurrence rules for intervals, weekdays, month positions, end
+conditions and exceptions while preserving recurrence properties the editor
+cannot represent.

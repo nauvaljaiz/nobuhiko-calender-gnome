@@ -33,6 +33,8 @@ struct _GcalRemindersSection
 
   GtkListBox         *alarms_listbox;
   GtkWidget          *alarms_popover;
+  GtkButton          *custom_add_button;
+  GtkSpinButton      *custom_minutes_spin;
   GtkListBoxRow      *new_alarm_row;
 
   GtkWidget          *event_start_button;
@@ -77,49 +79,6 @@ struct
     { 10080, OFFSET (one_week_button) }
 };
 
-static GtkWidget*
-get_row_for_alarm_trigger_minutes (GcalRemindersSection *self,
-                                   gint                  minutes)
-{
-  guint i;
-
-  for (i = 0; i < G_N_ELEMENTS (minutes_button); i++)
-    {
-      if (minutes_button[i].minutes == minutes)
-        return WIDGET_FROM_OFFSET (minutes_button[i].button_offset);
-    }
-
-  return NULL;
-}
-
-static ECalComponentAlarm*
-create_alarm (guint minutes)
-{
-
-  ECalComponentAlarmTrigger *trigger;
-  ECalComponentAlarm *alarm;
-  ICalDuration *duration;
-
-  duration = i_cal_duration_new_null_duration ();
-  i_cal_duration_set_is_neg (duration, TRUE);
-  i_cal_duration_set_minutes (duration, minutes);
-
-  trigger = e_cal_component_alarm_trigger_new_relative (E_CAL_COMPONENT_ALARM_TRIGGER_RELATIVE_START, duration);
-
-  g_clear_object (&duration);
-
-  alarm = e_cal_component_alarm_new ();
-  e_cal_component_alarm_take_trigger (alarm, trigger);
-
-  /* ONLY create "DISPLAY" alarm types. Don't expose "AUDIO" as an alarm type possibility for users to create;
-   * they're mutually independent from "DISPLAY" in RFC5545, and audio-only alarms are useless for users in practice.
-   * Furthermore, some other applications don't even allow creating/viewing/editing audio-only alarms on events!
-   * We should instead expect alarm notification systems to automatically play sounds when displaying notifications. */
-  e_cal_component_alarm_set_action (alarm, E_CAL_COMPONENT_ALARM_DISPLAY);
-
-  return alarm;
-}
-
 static void
 update_new_alarm_icon (GcalRemindersSection *self)
 {
@@ -129,6 +88,18 @@ update_new_alarm_icon (GcalRemindersSection *self)
     adw_button_row_set_start_icon_name (ADW_BUTTON_ROW (self->new_alarm_row), "add-reminder-symbolic");
   else
     adw_button_row_set_start_icon_name (ADW_BUTTON_ROW (self->new_alarm_row), "list-add-symbolic");
+}
+
+static void
+update_custom_add_button (GcalRemindersSection *self)
+{
+  GcalEvent *event;
+  guint minutes;
+
+  event = gcal_event_editor_section_get_event (GCAL_EVENT_EDITOR_SECTION (self));
+  minutes = gtk_spin_button_get_value_as_int (self->custom_minutes_spin);
+  gtk_widget_set_sensitive (GTK_WIDGET (self->custom_add_button),
+                            event && !gcal_event_has_alarm_at_minutes (event, minutes));
 }
 
 static void
@@ -148,6 +119,7 @@ clear_alarms (GcalRemindersSection *self)
     }
 
   update_new_alarm_icon (self);
+  update_custom_add_button (self);
 }
 
 static GtkWidget *
@@ -166,7 +138,7 @@ static void
 setup_alarms (GcalRemindersSection *self,
               GcalEvent            *event)
 {
-  g_autoptr (GList) alarms = NULL;
+  GList *alarms = NULL;
   GList *l;
 
   GCAL_ENTRY;
@@ -199,7 +171,7 @@ setup_alarms (GcalRemindersSection *self,
             gtk_widget_set_sensitive (WIDGET_FROM_OFFSET (minutes_button[j].button_offset), FALSE);
         }
 
-      GCAL_TRACE_MSG ("Adding alarm for %u minutes", minutes);
+      GCAL_TRACE_MSG ("Adding alarm with trigger index %d", minutes);
 
       /* Add the row */
       row = create_alarm_row (self, alarm);
@@ -207,6 +179,9 @@ setup_alarms (GcalRemindersSection *self,
     }
 
   update_new_alarm_icon (self);
+  update_custom_add_button (self);
+
+  g_list_free_full (alarms, e_cal_component_alarm_free);
 
   GCAL_EXIT;
 }
@@ -242,6 +217,11 @@ sort_alarms_func (GtkListBoxRow *a,
   alarm_b = gcal_alarm_row_get_alarm (GCAL_ALARM_ROW (b));
   minutes_b = get_alarm_trigger_minutes (event, alarm_b);
 
+  if (minutes_a < 0)
+    return minutes_b < 0 ? 0 : 1;
+  else if (minutes_b < 0)
+    return -1;
+
   return minutes_a - minutes_b;
 }
 
@@ -250,8 +230,6 @@ on_remove_alarm_cb (GcalAlarmRow         *alarm_row,
                     GcalRemindersSection *self)
 {
   ECalComponentAlarm *alarm;
-  GtkWidget *alarm_button;
-  gint trigger_minutes;
   GcalEvent *event;
 
   GCAL_ENTRY;
@@ -259,18 +237,8 @@ on_remove_alarm_cb (GcalAlarmRow         *alarm_row,
   event = gcal_event_editor_section_get_event (GCAL_EVENT_EDITOR_SECTION (self));
 
   alarm = gcal_alarm_row_get_alarm (alarm_row);
-  trigger_minutes = get_alarm_trigger_minutes (event, alarm);
-  gcal_event_remove_alarm (event, trigger_minutes);
-
-  /* Make the button sensitive again */
-  alarm_button = get_row_for_alarm_trigger_minutes (self, trigger_minutes);
-
-  if (alarm_button)
-    gtk_widget_set_sensitive (alarm_button, TRUE);
-
-  gtk_list_box_remove (self->alarms_listbox, GTK_WIDGET (alarm_row));
-
-  update_new_alarm_icon (self);
+  gcal_event_remove_alarm_by_uid (event, e_cal_component_alarm_get_uid (alarm));
+  setup_alarms (self, event);
 
   GCAL_EXIT;
 }
@@ -279,8 +247,6 @@ static void
 on_add_alarm_button_clicked_cb (GtkWidget            *button,
                                 GcalRemindersSection *self)
 {
-  ECalComponentAlarm *alarm;
-  GtkWidget *row;
   guint i, minutes;
   GcalEvent *event;
 
@@ -301,15 +267,33 @@ on_add_alarm_button_clicked_cb (GtkWidget            *button,
   if (minutes == G_MAXUINT)
     return;
 
-  alarm = create_alarm (minutes);
+  gcal_event_add_alarm_minutes (event, minutes);
+  setup_alarms (self, event);
+  gtk_popover_popdown (GTK_POPOVER (self->alarms_popover));
+}
 
-  row = create_alarm_row (self, alarm);
-  gtk_list_box_append (self->alarms_listbox, row);
-  gcal_event_add_alarm (event, alarm);
+static void
+on_custom_minutes_changed_cb (GtkSpinButton        *spin_button,
+                              GcalRemindersSection *self)
+{
+  update_custom_add_button (self);
+}
 
-  gtk_widget_set_sensitive (button, FALSE);
+static void
+on_add_custom_alarm_clicked_cb (GtkButton            *button,
+                                GcalRemindersSection *self)
+{
+  GcalEvent *event;
+  guint minutes;
 
-  update_new_alarm_icon (self);
+  event = gcal_event_editor_section_get_event (GCAL_EVENT_EDITOR_SECTION (self));
+  if (!event)
+    return;
+
+  minutes = gtk_spin_button_get_value_as_int (self->custom_minutes_spin);
+  gcal_event_add_alarm_minutes (event, minutes);
+  setup_alarms (self, event);
+  gtk_popover_popdown (GTK_POPOVER (self->alarms_popover));
 }
 
 static void
@@ -365,6 +349,8 @@ gcal_reminders_section_class_init (GcalRemindersSectionClass *klass)
 
   gtk_widget_class_bind_template_child (widget_class, GcalRemindersSection, alarms_listbox);
   gtk_widget_class_bind_template_child (widget_class, GcalRemindersSection, alarms_popover);
+  gtk_widget_class_bind_template_child (widget_class, GcalRemindersSection, custom_add_button);
+  gtk_widget_class_bind_template_child (widget_class, GcalRemindersSection, custom_minutes_spin);
   gtk_widget_class_bind_template_child (widget_class, GcalRemindersSection, event_start_button);
   gtk_widget_class_bind_template_child (widget_class, GcalRemindersSection, five_minutes_button);
   gtk_widget_class_bind_template_child (widget_class, GcalRemindersSection, new_alarm_row);
@@ -378,7 +364,9 @@ gcal_reminders_section_class_init (GcalRemindersSectionClass *klass)
   gtk_widget_class_bind_template_child (widget_class, GcalRemindersSection, two_days_button);
 
   gtk_widget_class_bind_template_callback (widget_class, on_add_alarm_button_clicked_cb);
+  gtk_widget_class_bind_template_callback (widget_class, on_add_custom_alarm_clicked_cb);
   gtk_widget_class_bind_template_callback (widget_class, on_alarms_listbox_row_activated_cb);
+  gtk_widget_class_bind_template_callback (widget_class, on_custom_minutes_changed_cb);
 }
 
 static void

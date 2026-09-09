@@ -98,7 +98,7 @@ struct _GcalEvent
 
   gboolean            all_day;
 
-  /* A map of GcalAlarmType */
+  /* Supported relative-start alarm minutes mapped to alarm UIDs */
   GHashTable         *alarms;
   GListStore         *attendees;
   GcalEventOrganizer *organizer;
@@ -283,6 +283,7 @@ load_alarms (GcalEvent *self)
 {
   GSList *alarm_uids, *l;
 
+  g_hash_table_remove_all (self->alarms);
   alarm_uids = e_cal_component_get_alarm_uids (self->component);
 
   for (l = alarm_uids; l != NULL; l = l->next)
@@ -293,8 +294,9 @@ load_alarms (GcalEvent *self)
       alarm = e_cal_component_get_alarm (self->component, l->data);
       trigger_minutes = get_alarm_trigger_minutes (self, alarm);
 
-      /* We only support a single alarm for a given time */
-      if (!g_hash_table_contains (self->alarms, GINT_TO_POINTER (trigger_minutes)))
+      /* Unsupported alarms stay in the component and are not indexed by time. */
+      if (trigger_minutes >= 0 &&
+          !g_hash_table_contains (self->alarms, GINT_TO_POINTER (trigger_minutes)))
         {
           g_hash_table_insert (self->alarms,
                                GINT_TO_POINTER (trigger_minutes),
@@ -1292,39 +1294,22 @@ gcal_event_has_alarms (GcalEvent *self)
 GList*
 gcal_event_get_alarms (GcalEvent *self)
 {
-  GHashTable *tmp;
   GSList *alarm_uids, *l;
   GList *alarms;
 
   g_return_val_if_fail (GCAL_IS_EVENT (self), NULL);
 
-  tmp = g_hash_table_new (g_direct_hash, g_direct_equal);
   alarms = NULL;
   alarm_uids = e_cal_component_get_alarm_uids (self->component);
 
   for (l = alarm_uids; l != NULL; l = l->next)
     {
       ECalComponentAlarm *alarm;
-      gint trigger_minutes;
-
       alarm = e_cal_component_get_alarm (self->component, l->data);
-      trigger_minutes = get_alarm_trigger_minutes (self, alarm);
-
-      /* We only support a single alarm for a given time */
-      if (!g_hash_table_contains (tmp, GINT_TO_POINTER (trigger_minutes)))
-        {
-          alarms = g_list_prepend (alarms, alarm);
-
-          g_hash_table_insert (tmp, GINT_TO_POINTER (trigger_minutes), NULL);
-        }
-      else
-        {
-          e_cal_component_alarm_free (alarm);
-        }
+      alarms = g_list_prepend (alarms, alarm);
     }
 
   g_slist_free_full (alarm_uids, g_free);
-  g_hash_table_destroy (tmp);
 
   return alarms;
 }
@@ -1338,22 +1323,21 @@ gcal_event_get_alarms (GcalEvent *self)
 void
 gcal_event_remove_all_alarms (GcalEvent *self)
 {
-  GHashTableIter iter;
-  const gchar *alarm_uid;
-  gint minutes;
+  GSList *alarm_uids;
 
   GCAL_ENTRY;
 
   g_return_if_fail (GCAL_IS_EVENT (self));
 
-  g_hash_table_iter_init (&iter, self->alarms);
-  while (g_hash_table_iter_next (&iter, (gpointer*) &minutes, (gpointer*) &alarm_uid))
+  alarm_uids = e_cal_component_get_alarm_uids (self->component);
+  for (GSList *l = alarm_uids; l; l = l->next)
     {
-      GCAL_TRACE_MSG ("Removing alarm %s from event %s", alarm_uid, gcal_event_get_uid (self));
-
-      e_cal_component_remove_alarm (self->component, alarm_uid);
-      g_hash_table_iter_remove (&iter);
+      GCAL_TRACE_MSG ("Removing alarm %s from event %s", (const gchar *) l->data, gcal_event_get_uid (self));
+      e_cal_component_remove_alarm (self->component, l->data);
     }
+
+  g_hash_table_remove_all (self->alarms);
+  g_slist_free_full (alarm_uids, g_free);
 
   e_cal_component_commit_sequence (self->component);
 
@@ -1374,7 +1358,7 @@ gcal_event_add_alarm (GcalEvent          *self,
 {
   ECalComponentAlarm *new_alarm;
   gchar *alarm_uid;
-  guint minutes;
+  gint minutes;
 
   GCAL_ENTRY;
 
@@ -1383,8 +1367,9 @@ gcal_event_add_alarm (GcalEvent          *self,
   new_alarm = e_cal_component_alarm_copy (alarm);
   minutes = get_alarm_trigger_minutes (self, alarm);
 
-  /* Only 1 alarm per relative time */
-  if (g_hash_table_contains (self->alarms, GINT_TO_POINTER (minutes)))
+  /* Only one supported alarm per relative time. Unsupported imported alarms
+   * have no time index and are always preserved. */
+  if (minutes >= 0 && g_hash_table_contains (self->alarms, GINT_TO_POINTER (minutes)))
     {
       alarm_uid = g_hash_table_lookup (self->alarms, GINT_TO_POINTER (minutes));
       e_cal_component_remove_alarm (self->component, alarm_uid);
@@ -1395,15 +1380,66 @@ gcal_event_add_alarm (GcalEvent          *self,
 
   /* Add to the hash table */
   alarm_uid = g_strdup (e_cal_component_alarm_get_uid (new_alarm));
-  g_hash_table_insert (self->alarms, GINT_TO_POINTER (minutes), alarm_uid);
-
   GCAL_TRACE_MSG ("Added alarm %s in event %s", alarm_uid, gcal_event_get_uid (self));
+
+  if (minutes >= 0)
+    g_hash_table_insert (self->alarms, GINT_TO_POINTER (minutes), alarm_uid);
+  else
+    g_free (alarm_uid);
 
   e_cal_component_alarm_free (new_alarm);
 
   e_cal_component_commit_sequence (self->component);
 
   GCAL_EXIT;
+}
+
+/**
+ * gcal_event_add_alarm_minutes:
+ * @self: a #GcalEvent
+ * @minutes: the number of minutes before the event starts
+ *
+ * Adds a display alarm that triggers @minutes before @self starts. If another
+ * supported alarm uses the same offset, it is replaced.
+ */
+void
+gcal_event_add_alarm_minutes (GcalEvent *self,
+                              guint      minutes)
+{
+  ICalDuration *duration;
+  ECalComponentAlarmTrigger *trigger;
+  ECalComponentAlarm *alarm;
+
+  g_return_if_fail (GCAL_IS_EVENT (self));
+  g_return_if_fail (minutes <= G_MAXINT / 60);
+
+  duration = i_cal_duration_new_from_int (-((gint) minutes * 60));
+  trigger = e_cal_component_alarm_trigger_new_relative (E_CAL_COMPONENT_ALARM_TRIGGER_RELATIVE_START, duration);
+  g_object_unref (duration);
+  alarm = e_cal_component_alarm_new ();
+  e_cal_component_alarm_take_trigger (alarm, trigger);
+  e_cal_component_alarm_set_action (alarm, E_CAL_COMPONENT_ALARM_DISPLAY);
+
+  gcal_event_add_alarm (self, alarm);
+  e_cal_component_alarm_free (alarm);
+}
+
+/**
+ * gcal_event_has_alarm_at_minutes:
+ * @self: a #GcalEvent
+ * @minutes: the number of minutes before the event starts
+ *
+ * Checks whether @self has a supported alarm at @minutes.
+ *
+ * Returns: %TRUE if a supported alarm uses the requested offset
+ */
+gboolean
+gcal_event_has_alarm_at_minutes (GcalEvent *self,
+                                 guint      minutes)
+{
+  g_return_val_if_fail (GCAL_IS_EVENT (self), FALSE);
+
+  return g_hash_table_contains (self->alarms, GINT_TO_POINTER (minutes));
 }
 
 /**
@@ -1434,7 +1470,47 @@ gcal_event_remove_alarm (GcalEvent *self,
       g_hash_table_remove (self->alarms, GINT_TO_POINTER (type));
 
       e_cal_component_commit_sequence (self->component);
+      load_alarms (self);
     }
+}
+
+/**
+ * gcal_event_remove_alarm_by_uid:
+ * @self: a #GcalEvent
+ * @uid: the alarm UID to remove
+ *
+ * Removes exactly the alarm identified by @uid. This can also remove an
+ * imported alarm whose trigger cannot be represented by the event editor.
+ */
+void
+gcal_event_remove_alarm_by_uid (GcalEvent   *self,
+                                const gchar *uid)
+{
+  ECalComponentAlarm *alarm;
+  GHashTableIter iter;
+  gpointer value;
+
+  g_return_if_fail (GCAL_IS_EVENT (self));
+  g_return_if_fail (uid != NULL);
+
+  alarm = e_cal_component_get_alarm (self->component, uid);
+  if (!alarm)
+    return;
+  e_cal_component_alarm_free (alarm);
+
+  g_hash_table_iter_init (&iter, self->alarms);
+  while (g_hash_table_iter_next (&iter, NULL, &value))
+    {
+      if (g_strcmp0 (value, uid) == 0)
+        {
+          g_hash_table_iter_remove (&iter);
+          break;
+        }
+    }
+
+  e_cal_component_remove_alarm (self->component, uid);
+  e_cal_component_commit_sequence (self->component);
+  load_alarms (self);
 }
 
 
@@ -1791,8 +1867,12 @@ gboolean
 gcal_event_alarms_equal (GcalEvent *event1,
                          GcalEvent *event2)
 {
-  g_autoptr (GList) alarms1 = NULL;
-  g_autoptr (GList) alarms2 = NULL;
+  g_autoptr (GPtrArray) alarm_strings2 = NULL;
+  g_autofree gboolean *matched = NULL;
+  gboolean equal = TRUE;
+  GList *alarms1;
+  GList *alarms2;
+  guint n_alarms;
 
   GCAL_ENTRY;
 
@@ -1800,40 +1880,56 @@ gcal_event_alarms_equal (GcalEvent *event1,
 
   alarms1 = gcal_event_get_alarms (event1);
   alarms2 = gcal_event_get_alarms (event2);
+  n_alarms = g_list_length (alarms1);
 
-  if (g_list_length (alarms1) != g_list_length (alarms2))
-    GCAL_RETURN (FALSE);
+  if (n_alarms != g_list_length (alarms2))
+    {
+      equal = FALSE;
+      goto out;
+    }
+
+  alarm_strings2 = g_ptr_array_new_with_free_func (g_free);
+  matched = g_new0 (gboolean, n_alarms);
+
+  for (GList *l = alarms2; l; l = l->next)
+    {
+      ICalComponent *component = e_cal_component_alarm_get_as_component (l->data);
+      g_ptr_array_add (alarm_strings2, i_cal_component_as_ical_string (component));
+      g_object_unref (component);
+    }
 
   for (GList *l = alarms1; l != NULL; l = l->next)
     {
-      ECalComponentAlarm *other_alarm;
-      ECalComponentAlarm *alarm;
+      g_autofree gchar *alarm_string = NULL;
+      ICalComponent *component;
+      gboolean found = FALSE;
 
-      alarm = l->data;
-      other_alarm = NULL;
+      component = e_cal_component_alarm_get_as_component (l->data);
+      alarm_string = i_cal_component_as_ical_string (component);
+      g_object_unref (component);
 
-      for (GList *i = alarms2; i != NULL; i = i->next)
+      for (guint i = 0; i < n_alarms; i++)
         {
-          ECalComponentAlarm *aux = i->data;
-
-          if (get_alarm_trigger_minutes (event1, alarm) != get_alarm_trigger_minutes (event1, aux))
-            continue;
-
-          other_alarm = aux;
-
-          if (e_cal_component_alarm_get_action (alarm) != e_cal_component_alarm_get_action (aux))
-            GCAL_RETURN (FALSE);
-
-          break;
+          if (!matched[i] && g_str_equal (alarm_string, g_ptr_array_index (alarm_strings2, i)))
+            {
+              matched[i] = TRUE;
+              found = TRUE;
+              break;
+            }
         }
 
-      if (!other_alarm)
-        GCAL_RETURN (FALSE);
-
-      /* TODO: this certainly needs deeper comparisons! */
+      if (!found)
+        {
+          equal = FALSE;
+          break;
+        }
     }
 
-  GCAL_RETURN (TRUE);
+out:
+  g_list_free_full (alarms1, e_cal_component_alarm_free);
+  g_list_free_full (alarms2, e_cal_component_alarm_free);
+
+  GCAL_RETURN (equal);
 }
 
 /**

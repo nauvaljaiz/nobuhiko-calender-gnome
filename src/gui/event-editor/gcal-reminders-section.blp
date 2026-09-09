@@ -18,7 +18,7 @@ template $GcalRemindersSection: $GcalEventEditorSection {
 }
 
 Popover alarms_popover {
-  width-request: 175;
+  width-request: 280;
 
   styles [
     "menu",
@@ -81,5 +81,54 @@ Popover alarms_popover {
       text: _("1 Week");
       clicked => $on_add_alarm_button_clicked_cb(template) not-swapped;
     }
+
+    Separator {
+      margin-top: 6;
+      margin-bottom: 6;
+    }
+
+    Label {
+      label: _("Custom reminder");
+      xalign: 0;
+
+      styles [
+        "heading",
+      ]
+    }
+
+    Box {
+      margin-top: 6;
+      spacing: 6;
+
+      SpinButton custom_minutes_spin {
+        numeric: true;
+        width-chars: 5;
+        adjustment: custom_minutes_adjustment;
+        value-changed => $on_custom_minutes_changed_cb(template) not-swapped;
+      }
+
+      Label {
+        hexpand: true;
+        label: _("minutes before");
+        xalign: 0;
+      }
+
+      Button custom_add_button {
+        label: _("Add");
+        clicked => $on_add_custom_alarm_clicked_cb(template) not-swapped;
+
+        styles [
+          "suggested-action",
+        ]
+      }
+    }
   }
+}
+
+Adjustment custom_minutes_adjustment {
+  lower: 1;
+  upper: 40320;
+  step-increment: 1;
+  page-increment: 15;
+  value: 45;
 }

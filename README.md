@@ -7,7 +7,8 @@ while adding deeper Google Calendar compatibility in small, testable stages.
 The current development build uses the application ID
 `local.nobuhiko.Calendar.Devel`, so it can be installed beside GNOME Calendar.
 The first fork features add event controls for **Busy/Free** availability and
-**Default/Public/Private** visibility.
+**Default/Public/Private** visibility, plus **custom reminder offsets** that
+preserve imported alarm types.
 
 ## Project plan
 

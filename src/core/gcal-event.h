@@ -114,8 +114,17 @@ void                 gcal_event_remove_all_alarms                (GcalEvent     
 void                 gcal_event_add_alarm                        (GcalEvent          *self,
                                                                   ECalComponentAlarm *alarm);
 
+void                 gcal_event_add_alarm_minutes                (GcalEvent          *self,
+                                                                  guint               minutes);
+
+gboolean             gcal_event_has_alarm_at_minutes             (GcalEvent          *self,
+                                                                  guint               minutes);
+
 void                 gcal_event_remove_alarm                     (GcalEvent          *self,
                                                                   guint               type);
+
+void                 gcal_event_remove_alarm_by_uid              (GcalEvent          *self,
+                                                                  const gchar        *uid);
 
 const gchar*         gcal_event_get_location                     (GcalEvent          *self);
 
