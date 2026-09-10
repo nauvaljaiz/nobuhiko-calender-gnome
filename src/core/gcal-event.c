@@ -94,7 +94,9 @@ struct _GcalEvent
   GcalRange          *range;
 
   GdkRGBA            *color;
+  GdkRGBA            *color_override;
   GBinding           *color_binding;
+  gboolean            imported_color;
 
   gboolean            all_day;
 
@@ -146,6 +148,59 @@ clear_range (GcalEvent *self)
 {
   g_clear_pointer (&self->range, gcal_range_unref);
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_RANGE]);
+}
+
+static void
+update_effective_color (GcalEvent *self)
+{
+  GdkRGBA fallback;
+
+  g_clear_pointer (&self->color_binding, g_binding_unbind);
+
+  if (self->color_override)
+    {
+      gcal_event_set_color (self, self->color_override);
+    }
+  else if (self->calendar)
+    {
+      self->color_binding = g_object_bind_property (self->calendar,
+                                                    "color",
+                                                    self,
+                                                    "color",
+                                                    G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+    }
+  else
+    {
+      gdk_rgba_parse (&fallback, "#ffffff");
+      gcal_event_set_color (self, &fallback);
+    }
+}
+
+static void
+load_color_override (GcalEvent *self)
+{
+  ICalComponent *ical_component;
+  ICalProperty *property;
+  ICalProperty *next_property;
+  GdkRGBA color;
+  const gchar *value;
+
+  ical_component = e_cal_component_get_icalcomponent (self->component);
+  property = i_cal_component_get_first_property (ical_component, I_CAL_COLOR_PROPERTY);
+  if (!property)
+    return;
+
+  next_property = i_cal_component_get_next_property (ical_component, I_CAL_COLOR_PROPERTY);
+  value = i_cal_property_get_color (property);
+
+  if (!next_property && value && gdk_rgba_parse (&color, value))
+    self->color_override = gdk_rgba_copy (&color);
+  else
+    self->imported_color = TRUE;
+
+  g_clear_object (&next_property);
+  g_clear_object (&property);
+  update_effective_color (self);
 }
 
 static GTimeZone*
@@ -431,6 +486,11 @@ setup_component (GcalEvent  *self,
   /* Setup UID */
   gcal_event_update_uid_internal (self);
 
+  /* Load an optional RFC 7986 COLOR override after the calendar fallback has
+   * been set up. Invalid or duplicate properties stay untouched as imported
+   * metadata until the user explicitly replaces them. */
+  load_color_override (self);
+
   /* Set has-recurrence to check if the component has recurrence or not */
   self->has_recurrence = e_cal_component_has_recurrences (self->component);
 
@@ -506,6 +566,7 @@ gcal_event_finalize (GObject *object)
   g_clear_pointer (&self->alarms, g_hash_table_unref);
   g_clear_pointer (&self->uid, g_free);
   g_clear_pointer (&self->color, gdk_rgba_free);
+  g_clear_pointer (&self->color_override, gdk_rgba_free);
   g_clear_pointer (&self->recurrence, gcal_recurrence_unref);
   g_clear_object (&self->component);
   g_clear_object (&self->calendar);
@@ -1010,12 +1071,43 @@ gcal_event_get_color (GcalEvent *self)
 }
 
 /**
+ * gcal_event_get_color_override:
+ * @self: a #GcalEvent
+ *
+ * Gets the event-specific RFC 7986 COLOR value, if it is representable.
+ *
+ * Returns: (transfer none) (nullable): the event color override
+ */
+const GdkRGBA *
+gcal_event_get_color_override (GcalEvent *self)
+{
+  g_return_val_if_fail (GCAL_IS_EVENT (self), NULL);
+
+  return self->color_override;
+}
+
+/**
+ * gcal_event_has_imported_color:
+ * @self: a #GcalEvent
+ *
+ * Returns whether the component contains COLOR data this editor cannot safely
+ * represent, such as an invalid value or duplicate properties.
+ */
+gboolean
+gcal_event_has_imported_color (GcalEvent *self)
+{
+  g_return_val_if_fail (GCAL_IS_EVENT (self), FALSE);
+
+  return self->imported_color;
+}
+
+/**
  * gcal_event_set_color:
  * @self: a #GcalEvent
  * @color: a #GdkRGBA
  *
- * Sets the color of the event, which is passed to the
- * parent #ESource.
+ * Sets the effective display color used by the calendar binding or an event
+ * color override.
  */
 void
 gcal_event_set_color (GcalEvent *self,
@@ -1030,6 +1122,61 @@ gcal_event_set_color (GcalEvent *self,
 
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COLOR]);
     }
+}
+
+/**
+ * gcal_event_set_color_override:
+ * @self: a #GcalEvent
+ * @color: (nullable): a custom event color, or %NULL to use the calendar color
+ *
+ * Writes the event-specific iCalendar COLOR property defined by RFC 7986.
+ * Provider-specific color metadata is left untouched for a future
+ * synchronization adapter.
+ */
+void
+gcal_event_set_color_override (GcalEvent     *self,
+                               const GdkRGBA *color)
+{
+  g_autofree gchar *color_string = NULL;
+  ICalComponent *ical_component;
+  ICalProperty *property;
+  GdkRGBA opaque_color;
+
+  g_return_if_fail (GCAL_IS_EVENT (self));
+
+  if (color)
+    {
+      opaque_color = *color;
+      opaque_color.alpha = 1.0;
+      color = &opaque_color;
+    }
+
+  if (!self->imported_color &&
+      ((!color && !self->color_override) ||
+       (color && self->color_override && gdk_rgba_equal (color, self->color_override))))
+    return;
+
+  ical_component = e_cal_component_get_icalcomponent (self->component);
+  while ((property = i_cal_component_get_first_property (ical_component, I_CAL_COLOR_PROPERTY)))
+    {
+      i_cal_component_remove_property (ical_component, property);
+      g_clear_object (&property);
+    }
+
+  g_clear_pointer (&self->color_override, gdk_rgba_free);
+  self->imported_color = FALSE;
+
+  if (color)
+    {
+      self->color_override = gdk_rgba_copy (color);
+      color_string = gdk_rgba_to_string (color);
+      property = i_cal_property_new_color (color_string);
+      i_cal_component_add_property (ical_component, property);
+      g_clear_object (&property);
+    }
+
+  e_cal_component_commit_sequence (self->component);
+  update_effective_color (self);
 }
 
 /**
@@ -1594,17 +1741,7 @@ gcal_event_set_calendar (GcalEvent    *self,
 
   if (g_set_object (&self->calendar, calendar))
     {
-      /* Remove previous binding */
-      g_clear_pointer (&self->color_binding, g_binding_unbind);
-
-      if (calendar)
-        {
-          self->color_binding = g_object_bind_property (calendar,
-                                                        "color",
-                                                        self,
-                                                        "color",
-                                                        G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
-        }
+      update_effective_color (self);
 
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_CALENDAR]);
 
@@ -1968,6 +2105,52 @@ gcal_event_visibility_equal (GcalEvent *event1,
   g_return_val_if_fail (GCAL_IS_EVENT (event2), FALSE);
 
   return gcal_event_get_visibility (event1) == gcal_event_get_visibility (event2);
+}
+
+static gchar *
+serialize_color_properties (GcalEvent *event)
+{
+  g_autoptr (GString) serialized = g_string_new (NULL);
+  ICalComponent *ical_component;
+  ICalProperty *property;
+
+  ical_component = e_cal_component_get_icalcomponent (event->component);
+  property = i_cal_component_get_first_property (ical_component, I_CAL_COLOR_PROPERTY);
+
+  while (property)
+    {
+      g_autofree gchar *property_string = i_cal_property_as_ical_string (property);
+
+      g_string_append (serialized, property_string);
+      g_clear_object (&property);
+      property = i_cal_component_get_next_property (ical_component, I_CAL_COLOR_PROPERTY);
+    }
+
+  return g_string_free (g_steal_pointer (&serialized), FALSE);
+}
+
+/**
+ * gcal_event_color_equal:
+ * @event1: a #GcalEvent
+ * @event2: a #GcalEvent
+ *
+ * Checks whether both components contain identical event COLOR properties.
+ * Comparing the serialized properties also protects imported values.
+ */
+gboolean
+gcal_event_color_equal (GcalEvent *event1,
+                        GcalEvent *event2)
+{
+  g_autofree gchar *color1 = NULL;
+  g_autofree gchar *color2 = NULL;
+
+  g_return_val_if_fail (GCAL_IS_EVENT (event1), FALSE);
+  g_return_val_if_fail (GCAL_IS_EVENT (event2), FALSE);
+
+  color1 = serialize_color_properties (event1);
+  color2 = serialize_color_properties (event2);
+
+  return g_str_equal (color1, color2);
 }
 
 /**

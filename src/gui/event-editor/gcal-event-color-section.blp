@@ -1,0 +1,38 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $GcalEventColorSection: $GcalEventEditorSection {
+  title: _("Appearance");
+
+  Adw.SwitchRow custom_color_row {
+    title: _("Custom Event Color");
+    subtitle: _("Override the calendar color for this event");
+    sensitive: bind template.dialog as <$GcalEventEditorDialog>.writable;
+    notify::active => $on_custom_color_changed_cb(template) not-swapped;
+  }
+
+  Adw.ActionRow event_color_row {
+    visible: false;
+    title: _("Event Color");
+    activatable-widget: event_color_button;
+    sensitive: bind template.dialog as <$GcalEventEditorDialog>.writable;
+
+    ColorDialogButton event_color_button {
+      valign: center;
+
+      dialog: ColorDialog {
+        modal: true;
+        with-alpha: false;
+      };
+
+      notify::rgba => $on_event_color_changed_cb(template) not-swapped;
+    }
+  }
+
+  Adw.ActionRow imported_color_row {
+    visible: false;
+    title: _("Imported Event Color");
+    subtitle: _("This color cannot be edited safely and will be preserved unless replaced");
+    icon-name: "dialog-information-symbolic";
+  }
+}

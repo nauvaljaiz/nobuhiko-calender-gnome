@@ -64,6 +64,8 @@ struct _GcalEventWidget
 
   /* internal data */
   gchar              *css_class;
+  GtkCssProvider     *color_provider;
+  GdkDisplay         *color_provider_display;
 
   GcalEvent          *event;
 
@@ -183,6 +185,7 @@ gcal_event_widget_update_style (GcalEventWidget *self)
 static void
 update_color (GcalEventWidget *self)
 {
+  g_autofree gchar *css = NULL;
   GdkRGBA *color;
   GQuark color_id;
   gchar *color_str;
@@ -210,6 +213,26 @@ update_color (GcalEventWidget *self)
   color_str = gdk_rgba_to_string (color);
   color_id = g_quark_from_string (color_str);
   css_class = g_strdup_printf ("color-%d", color_id);
+
+  if (gcal_event_get_color_override (self->event) && !self->color_provider_display)
+    {
+      self->color_provider_display = gtk_widget_get_display (GTK_WIDGET (self));
+      gtk_style_context_add_provider_for_display (self->color_provider_display,
+                                                  GTK_STYLE_PROVIDER (self->color_provider),
+                                                  GTK_STYLE_PROVIDER_PRIORITY_APPLICATION + 2);
+    }
+
+  if (gcal_event_get_color_override (self->event))
+    {
+      css = g_strdup_printf (".%s { --event-bg-color: %s; }", css_class, color_str);
+      gtk_css_provider_load_from_string (self->color_provider, css);
+    }
+  else if (self->color_provider_display)
+    {
+      gtk_style_context_remove_provider_for_display (self->color_provider_display,
+                                                     GTK_STYLE_PROVIDER (self->color_provider));
+      self->color_provider_display = NULL;
+    }
 
   gtk_widget_add_css_class (GTK_WIDGET (self), css_class);
 
@@ -649,6 +672,15 @@ gcal_event_widget_dispose (GObject *object)
   GcalEventWidget *self = GCAL_EVENT_WIDGET (object);
 
   g_clear_object (&self->clock_signal_group);
+
+  if (self->color_provider_display)
+    {
+      gtk_style_context_remove_provider_for_display (self->color_provider_display,
+                                                     GTK_STYLE_PROVIDER (self->color_provider));
+      self->color_provider_display = NULL;
+    }
+
+  g_clear_object (&self->color_provider);
   g_clear_object (&self->context_signal_group);
   g_clear_object (&self->event_signal_group);
 
@@ -747,6 +779,8 @@ gcal_event_widget_init (GcalEventWidget *self)
   g_type_ensure (GCAL_TYPE_OVERFLOW_BIN);
 
   gtk_widget_init_template (GTK_WIDGET (self));
+
+  self->color_provider = gtk_css_provider_new ();
 
   gtk_widget_set_cursor_from_name (GTK_WIDGET (self), "pointer");
 

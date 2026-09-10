@@ -22,7 +22,8 @@ existing test suite passes and unrelated event metadata survives round-trips.
   with safe preservation of imported rules and `EXDATE` exceptions.
 - [x] Custom reminder offsets with safe preservation of imported alarm types.
 - [ ] Calendar-level default reminders and Google email reminder delivery.
-- [ ] Per-event color and generic attachments.
+- [x] Per-event color with calendar fallback and preservation of provider metadata.
+- [ ] Generic attachments.
 - [ ] Export one event, a date range, or a calendar to ICS.
 
 ## Phase 2 — native productivity
@@ -74,6 +75,6 @@ existing test suite passes and unrelated event metadata survives round-trips.
 
 ## Current next slice
 
-Add per-event color using provider-neutral iCalendar/EDS storage, then map it to
-Google event color IDs in the future provider adapter without losing unknown
-color metadata.
+Add generic event attachments with safe URI/file handling and preservation of
+unsupported attachment parameters. Google Drive attachment creation remains a
+future provider-adapter operation.

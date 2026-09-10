@@ -99,6 +99,26 @@
                                  "X-NOBUHIKO-KEEP:preserved\n"                \
                                  "END:VEVENT\n"
 
+#define STUB_EVENT_WITH_COLOR "BEGIN:VEVENT\n"                       \
+                              "SUMMARY:Colored event\n"             \
+                              "UID:color@example.test\n"             \
+                              "DTSTART:20260910T090000Z\n"           \
+                              "DTEND:20260910T100000Z\n"             \
+                              "COLOR:#4285F4\n"                      \
+                              "X-GOOGLE-COLOR-ID:9\n"                \
+                              "X-NOBUHIKO-KEEP:color\n"              \
+                              "END:VEVENT\n"
+
+#define STUB_EVENT_WITH_IMPORTED_COLOR "BEGIN:VEVENT\n"               \
+                                       "SUMMARY:Imported color\n"       \
+                                       "UID:imported-color@example.test\n" \
+                                       "DTSTART:20260910T090000Z\n"     \
+                                       "DTEND:20260910T100000Z\n"       \
+                                       "COLOR:not-a-color\n"            \
+                                       "COLOR:blue\n"                   \
+                                       "X-GOOGLE-COLOR-ID:future-value\n" \
+                                       "END:VEVENT\n"
+
 #define STUB_EVENT_WITH_MIXED_ALARMS "BEGIN:VEVENT\n"                          \
                                      "SUMMARY:Alarm preservation\n"             \
                                      "UID:alarms@example.test\n"                 \
@@ -419,6 +439,86 @@ event_visibility_preserves_metadata (void)
   g_assert_nonnull (strstr (serialized, "ATTENDEE:mailto:guest@example.test"));
   g_assert_nonnull (strstr (serialized, "ATTACH:https://example.test/file"));
   g_assert_nonnull (strstr (serialized, "X-NOBUHIKO-KEEP:preserved"));
+}
+
+/*********************************************************************************************************************/
+
+static void
+event_color_override_roundtrips (void)
+{
+  g_autoptr (GcalEvent) event = create_event_for_string (STUB_EVENT_WITH_COLOR, NULL);
+  g_autoptr (GcalEvent) clone = NULL;
+  GdkRGBA expected;
+  GdkRGBA replacement;
+  const GdkRGBA *override;
+  g_autofree gchar *serialized = NULL;
+
+  g_assert_true (gdk_rgba_parse (&expected, "#4285F4"));
+  override = gcal_event_get_color_override (event);
+  g_assert_nonnull (override);
+  g_assert_true (gdk_rgba_equal (&expected, override));
+  g_assert_true (gdk_rgba_equal (&expected, gcal_event_get_color (event)));
+  g_assert_false (gcal_event_has_imported_color (event));
+
+  clone = gcal_event_new_from_event (event);
+  g_assert_true (gcal_event_color_equal (event, clone));
+
+  g_assert_true (gdk_rgba_parse (&replacement, "#0F9D58"));
+  gcal_event_set_color_override (clone, &replacement);
+  g_assert_false (gcal_event_color_equal (event, clone));
+  g_assert_true (gdk_rgba_equal (&replacement, gcal_event_get_color_override (clone)));
+  g_assert_true (gdk_rgba_equal (&replacement, gcal_event_get_color (clone)));
+
+  serialized = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (clone)));
+  g_assert_nonnull (strstr (serialized, "COLOR:"));
+  g_assert_nonnull (strstr (serialized, "X-GOOGLE-COLOR-ID:9"));
+  g_assert_nonnull (strstr (serialized, "X-NOBUHIKO-KEEP:color"));
+
+  gcal_event_set_color_override (clone, NULL);
+  g_clear_pointer (&serialized, g_free);
+  serialized = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (clone)));
+  g_assert_null (gcal_event_get_color_override (clone));
+  g_assert_null (strstr (serialized, "\r\nCOLOR:"));
+  g_assert_nonnull (strstr (serialized, "X-GOOGLE-COLOR-ID:9"));
+  g_assert_nonnull (strstr (serialized, "X-NOBUHIKO-KEEP:color"));
+}
+
+/*********************************************************************************************************************/
+
+static void
+event_imported_color_is_preserved (void)
+{
+  g_autoptr (GcalEvent) event = create_event_for_string (STUB_EVENT_WITH_IMPORTED_COLOR, NULL);
+  g_autofree gchar *before = NULL;
+  g_autofree gchar *after = NULL;
+  GdkRGBA replacement;
+
+  g_assert_null (gcal_event_get_color_override (event));
+  g_assert_true (gcal_event_has_imported_color (event));
+
+  before = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (event)));
+  gcal_event_set_busy (event, FALSE);
+  after = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (event)));
+  g_assert_nonnull (strstr (after, "COLOR:not-a-color"));
+  g_assert_nonnull (strstr (after, "COLOR:blue"));
+  g_assert_nonnull (strstr (after, "X-GOOGLE-COLOR-ID:future-value"));
+
+  g_assert_true (gdk_rgba_parse (&replacement, "#DB4437"));
+  gcal_event_set_color_override (event, &replacement);
+  g_assert_false (gcal_event_has_imported_color (event));
+  g_assert_nonnull (gcal_event_get_color_override (event));
+  g_assert_nonnull (strstr (before, "COLOR:not-a-color"));
+
+  g_clear_pointer (&after, g_free);
+  after = i_cal_component_as_ical_string (
+      e_cal_component_get_icalcomponent (gcal_event_get_component (event)));
+  g_assert_null (strstr (after, "COLOR:not-a-color"));
+  g_assert_null (strstr (after, "COLOR:blue"));
+  g_assert_nonnull (strstr (after, "X-GOOGLE-COLOR-ID:future-value"));
 }
 
 /*********************************************************************************************************************/
@@ -1052,6 +1152,8 @@ main (gint   argc,
   g_test_add_func ("/event/visibility", event_visibility);
   g_test_add_func ("/event/visibility/preserves-special-values", event_visibility_preserves_special_values);
   g_test_add_func ("/event/visibility/preserves-metadata", event_visibility_preserves_metadata);
+  g_test_add_func ("/event/color/override-roundtrip", event_color_override_roundtrips);
+  g_test_add_func ("/event/color/imported-preserved", event_imported_color_is_preserved);
   g_test_add_func ("/event/reminders/preserve-imported-alarms", event_reminders_preserve_imported_alarms);
   g_test_add_func ("/event/reminders/reindex-duplicate-offsets", event_reminders_reindex_duplicate_offsets);
   g_test_add_func ("/event/recurrence/custom-roundtrip", event_custom_recurrence_roundtrips);

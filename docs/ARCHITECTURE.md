@@ -44,6 +44,15 @@ exceptions survive edits to those supported rules. Multiple `RRULE` values,
 `RDATE`, `EXRULE`, `BYSETPOS`, and other shapes stay in the EDS component and
 appear as imported recurrence until the user explicitly chooses a replacement.
 
+Per-event appearance uses the iCalendar
+[`COLOR` property](https://www.rfc-editor.org/rfc/rfc7986.html#section-5.9) as
+a provider-neutral override and falls back to the EDS calendar source color.
+Invalid or duplicate `COLOR` properties remain imported and unchanged.
+Provider-specific properties,
+including a future Google color ID, are never removed by the generic color
+editor. Event widgets install the effective color locally so custom colors do
+not need to be registered as calendar colors.
+
 Google incremental synchronization persists `nextSyncToken`, follows pagination,
 includes deletions, and performs a new full sync after an HTTP 410 response, as
 specified by the [official synchronization guide](https://developers.google.com/workspace/calendar/api/guides/sync).

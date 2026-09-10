@@ -10,7 +10,8 @@ The first fork features add event controls for **Busy/Free** availability and
 **Default/Public/Private** visibility, plus **custom reminder offsets** that
 preserve imported alarm types. Recurring events support custom intervals,
 weekday selection, monthly patterns, occurrence counts and end dates while
-retaining recurrence rules that the editor cannot represent.
+retaining recurrence rules that the editor cannot represent. Events can also
+override their calendar color without discarding imported provider metadata.
 
 ## Project plan
 

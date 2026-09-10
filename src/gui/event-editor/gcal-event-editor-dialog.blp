@@ -60,6 +60,10 @@ template $GcalEventEditorDialog: Adw.Dialog {
             dialog: template;
           }
 
+          $GcalEventColorSection {
+            dialog: template;
+          }
+
           $GcalRemindersSection {
             title: _("Reminders");
             sensitive: bind template.writable;

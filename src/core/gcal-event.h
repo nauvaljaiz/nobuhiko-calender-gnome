@@ -84,6 +84,13 @@ GdkRGBA*             gcal_event_get_color                        (GcalEvent     
 void                 gcal_event_set_color                        (GcalEvent          *self,
                                                                   GdkRGBA            *color);
 
+const GdkRGBA*       gcal_event_get_color_override               (GcalEvent          *self);
+
+gboolean             gcal_event_has_imported_color               (GcalEvent          *self);
+
+void                 gcal_event_set_color_override               (GcalEvent          *self,
+                                                                  const GdkRGBA      *color);
+
 ECalComponent*       gcal_event_get_component                    (GcalEvent          *self);
 
 GDateTime*           gcal_event_get_date_end                     (GcalEvent          *self);
@@ -175,6 +182,9 @@ gboolean             gcal_event_availability_equal               (GcalEvent     
                                                                   GcalEvent          *event2);
 
 gboolean             gcal_event_visibility_equal                 (GcalEvent          *event1,
+                                                                  GcalEvent          *event2);
+
+gboolean             gcal_event_color_equal                      (GcalEvent          *event1,
                                                                   GcalEvent          *event2);
 
 gboolean             gcal_event_schedule_equal                   (GcalEvent          *event1,

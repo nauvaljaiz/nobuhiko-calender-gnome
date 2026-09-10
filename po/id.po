@@ -1983,6 +1983,30 @@ msgid "year"
 msgid_plural "years"
 msgstr[0] "tahun"
 
+#: src/gui/event-editor/gcal-event-color-section.blp
+msgid "Appearance"
+msgstr "Tampilan"
+
+#: src/gui/event-editor/gcal-event-color-section.blp
+msgid "Custom Event Color"
+msgstr "Warna Acara Khusus"
+
+#: src/gui/event-editor/gcal-event-color-section.blp
+msgid "Override the calendar color for this event"
+msgstr "Gunakan warna lain dari warna kalender untuk acara ini"
+
+#: src/gui/event-editor/gcal-event-color-section.blp
+msgid "Event Color"
+msgstr "Warna Acara"
+
+#: src/gui/event-editor/gcal-event-color-section.blp
+msgid "Imported Event Color"
+msgstr "Warna Acara yang Diimpor"
+
+#: src/gui/event-editor/gcal-event-color-section.blp
+msgid "This color cannot be edited safely and will be preserved unless replaced"
+msgstr "Warna ini tidak dapat disunting dengan aman dan akan dipertahankan kecuali diganti"
+
 #~ msgid "Notes"
 #~ msgstr "Catatan"
 

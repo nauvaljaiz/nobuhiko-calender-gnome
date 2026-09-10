@@ -27,6 +27,7 @@
 #include "gcal-debug.h"
 #include "gcal-event-attendee.h"
 #include "gcal-event-editor-dialog.h"
+#include "gcal-event-color-section.h"
 #include "gcal-event-editor-section.h"
 #include "gcal-event.h"
 #include "gcal-notes-section.h"
@@ -193,7 +194,8 @@ static void
 apply_event_properties_to_template_event (GcalEvent *template_event,
                                           GcalEvent *event,
                                           gboolean   availability_changed,
-                                          gboolean   visibility_changed)
+                                          gboolean   visibility_changed,
+                                          gboolean   color_changed)
 {
   g_autoptr (GDateTime) start_date = NULL;
   g_autoptr (GDateTime) end_date = NULL;
@@ -229,6 +231,8 @@ apply_event_properties_to_template_event (GcalEvent *template_event,
     gcal_event_set_busy (template_event, gcal_event_get_busy (event));
   if (visibility_changed)
     gcal_event_set_visibility (template_event, gcal_event_get_visibility (event));
+  if (color_changed)
+    gcal_event_set_color_override (template_event, gcal_event_get_color_override (event));
   gcal_event_set_recurrence (template_event, gcal_event_get_recurrence (event));
   gcal_event_set_all_day (template_event, gcal_event_get_all_day (event));
   gcal_event_set_date_start (template_event, start_date);
@@ -282,7 +286,7 @@ save_event (GcalEventEditorDialog *self,
   GcalContext *context;
   GcalManager *manager;
 
-  gboolean calendar_equal, alarms_equal, availability_equal, visibility_equal;
+  gboolean calendar_equal, alarms_equal, availability_equal, visibility_equal, color_equal;
   gboolean schedule_equal, strings_equal, event_equal;
 
   GCAL_ENTRY;
@@ -296,9 +300,10 @@ save_event (GcalEventEditorDialog *self,
   alarms_equal = gcal_event_alarms_equal (self->event, self->edited_event);
   availability_equal = gcal_event_availability_equal (self->event, self->edited_event);
   visibility_equal = gcal_event_visibility_equal (self->event, self->edited_event);
+  color_equal = gcal_event_color_equal (self->event, self->edited_event);
   schedule_equal = gcal_event_schedule_equal (self->event, self->edited_event);
   strings_equal = gcal_event_strings_equal (self->event, self->edited_event);
-  event_equal = calendar_equal && alarms_equal && availability_equal && visibility_equal &&
+  event_equal = calendar_equal && alarms_equal && availability_equal && visibility_equal && color_equal &&
                 schedule_equal && strings_equal;
 
   if (self->event_is_new)
@@ -479,7 +484,8 @@ on_ask_recurrence_response_save_cb (GcalEvent             *event,
         apply_event_properties_to_template_event (template_event,
                                                   event,
                                                   !gcal_event_availability_equal (self->event, event),
-                                                  !gcal_event_visibility_equal (self->event, event));
+                                                  !gcal_event_visibility_equal (self->event, event),
+                                                  !gcal_event_color_equal (self->event, event));
         gcal_manager_update_event (manager, template_event, mod_type);
       }
       break;
@@ -577,6 +583,7 @@ gcal_event_editor_dialog_class_init (GcalEventEditorDialogClass *klass)
 
   g_type_ensure (GCAL_TYPE_CALENDAR_COMBO_ROW);
   g_type_ensure (GCAL_TYPE_AVAILABILITY_SECTION);
+  g_type_ensure (GCAL_TYPE_EVENT_COLOR_SECTION);
   g_type_ensure (GCAL_TYPE_NOTES_SECTION);
   g_type_ensure (GCAL_TYPE_REMINDERS_SECTION);
   g_type_ensure (GCAL_TYPE_SCHEDULE_SECTION);

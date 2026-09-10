@@ -69,3 +69,26 @@ a release gate before Google adapter features ship.
   AppStream and Indonesian catalog validation also pass.
 - An isolated eight-second graphical smoke test loaded the expanded schedule
   editor without an application or GTK critical error.
+
+## 2026-09-10 — per-event color
+
+- Added an optional event color override backed by the iCalendar `COLOR`
+  property, with the EDS calendar source color retained as the default.
+- Valid color values round-trip through cloned events and update the effective
+  event-widget color. Invalid or duplicate values are shown as imported and
+  remain unchanged during unrelated edits.
+- Replacing or clearing a color only changes `COLOR`; provider-specific fields
+  such as a future Google color ID and unrelated custom properties survive.
+- Save equality and recurring-series updates now include event color changes.
+  The future Google adapter can map these colors to the writable `colorId`
+  field and palette returned by the
+  [Google Calendar Colors endpoint](https://developers.google.com/workspace/calendar/api/v3/reference/colors/get).
+- Targeted tests cover valid color round-trips, calendar-color fallback,
+  invalid and duplicate imported values, explicit replacement and preservation
+  of provider-specific metadata.
+- The full Meson suite remains green at 11/11 tests; strict schema, desktop file,
+  AppStream and Indonesian catalog validation also pass. AppStream reports only
+  the expected informational note for the temporary `local.*` application ID.
+- An isolated eight-second graphical smoke test loaded the event color editor
+  and kept the application running without an application or GTK critical
+  error.
